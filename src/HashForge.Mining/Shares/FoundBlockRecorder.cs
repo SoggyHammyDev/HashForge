@@ -7,47 +7,14 @@ using Microsoft.Extensions.Logging;
 
 namespace HashForge.Mining.Shares;
 
-public sealed partial class BlockCandidateHandler(
-    IBlockSubmitter submitter,
+/// <summary>Deals with the aftermath of a solved block: the archive, the announcements and fresh work.</summary>
+public sealed partial class FoundBlockRecorder(
     IBlockRepository repository,
     IStatisticsReader statistics,
     IEnumerable<IBlockObserver> blockObservers,
     ITemplateRefresher templateRefresher,
-    TimeProvider timeProvider,
-    ILogger<BlockCandidateHandler> logger) : IBlockCandidateHandler
+    ILogger<FoundBlockRecorder> logger) : IFoundBlockRecorder
 {
-    public const int SubmitAttempts = 3;
-
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(1);
-
-    public async Task<BlockSubmissionResult> SubmitAsync(MiningJob job, BlockCandidate block)
-    {
-        ArgumentNullException.ThrowIfNull(job);
-        ArgumentNullException.ThrowIfNull(block);
-
-        for (var attempt = 1; ; attempt++)
-        {
-            try
-            {
-                return await submitter.SubmitBlockAsync(block.Hex, CancellationToken.None).ConfigureAwait(false);
-            }
-#pragma warning disable CA1031 // Whatever went wrong, the only sensible response is to try again and keep the block.
-            catch (Exception exception)
-#pragma warning restore CA1031
-            {
-                if (attempt == SubmitAttempts)
-                {
-                    // The full block is logged so that it can still be submitted by hand.
-                    LogSubmitGaveUp(exception, job.Template.Height, block.Hash, block.Hex);
-                    return new BlockSubmissionResult($"could not reach the node: {exception.Message}");
-                }
-
-                LogSubmitRetry(exception, job.Template.Height, block.Hash, attempt);
-                await Task.Delay(RetryDelay, timeProvider, CancellationToken.None).ConfigureAwait(false);
-            }
-        }
-    }
-
     public async Task RecordAsync(
         MiningJob job,
         BlockCandidate block,
@@ -60,22 +27,7 @@ public sealed partial class BlockCandidateHandler(
         ArgumentNullException.ThrowIfNull(share);
         ArgumentNullException.ThrowIfNull(nodeVerdict);
 
-        var found = new FoundBlock(
-            job.Pool.Name,
-            job.Pool.Scheme,
-            job.Template.Height,
-            block.Hash,
-            share.Worker,
-            job.Template.CoinbaseValue,
-            job.Payouts,
-            statistics.GetRoundEffortPercent(job.Pool, share.Worker.Address),
-            share.Timestamp,
-            nodeVerdict.Accepted,
-            nodeVerdict.RejectReason)
-        {
-            MinersPaid = job.MinersPaid,
-        };
-
+        var found = Describe(job, block, share, nodeVerdict);
         if (found.Accepted)
         {
             LogBlockFound(found.Height, found.Hash, found.PoolName, found.Worker.FullName);
@@ -100,6 +52,22 @@ public sealed partial class BlockCandidateHandler(
         await RunStepAsync("template refresh", () => templateRefresher.RefreshAsync(cancellationToken)).ConfigureAwait(false);
     }
 
+    private FoundBlock Describe(MiningJob job, BlockCandidate block, ShareResult share, BlockSubmissionResult nodeVerdict) => new(
+        job.Pool.Name,
+        job.Pool.Scheme,
+        job.Template.Height,
+        block.Hash,
+        share.Worker,
+        job.Template.CoinbaseValue,
+        job.Payouts,
+        statistics.GetRoundEffortPercent(job.Pool, share.Worker.Address),
+        share.Timestamp,
+        nodeVerdict.Accepted,
+        nodeVerdict.RejectReason)
+    {
+        MinersPaid = job.MinersPaid,
+    };
+
     private async Task RunStepAsync(string step, Func<Task> action)
     {
         try
@@ -119,12 +87,6 @@ public sealed partial class BlockCandidateHandler(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The node rejected block {Height} ({Hash}): {Reason}")]
     private partial void LogBlockRejected(int height, string hash, string? reason);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Submitting block {Height} ({Hash}) failed on attempt {Attempt}; retrying")]
-    private partial void LogSubmitRetry(Exception exception, int height, string hash, int attempt);
-
-    [LoggerMessage(Level = LogLevel.Critical, Message = "GAVE UP submitting block {Height} ({Hash}). Submit it manually with submitblock: {BlockHex}")]
-    private partial void LogSubmitGaveUp(Exception exception, int height, string hash, string blockHex);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "After a block was found, the '{Step}' step failed")]
     private partial void LogStepFailed(Exception exception, string step);

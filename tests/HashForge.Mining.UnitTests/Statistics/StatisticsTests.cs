@@ -7,7 +7,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace HashForge.Mining.UnitTests.Statistics;
 
-public sealed class StatisticsServiceTests
+public sealed class StatisticsTests
 {
     private const double NetworkDifficulty = 1000;
 
@@ -19,9 +19,9 @@ public sealed class StatisticsServiceTests
     private readonly FakeTimeProvider _time = new(TestData.Now);
     private readonly PoolDefinition _pplns = TestData.Pool("pplns", PayoutScheme.Pplns, 1);
     private readonly PoolDefinition _solo = TestData.Pool("solo", PayoutScheme.Solo, 2);
-    private readonly StatisticsService _service;
+    private readonly StatisticsRig _service;
 
-    public StatisticsServiceTests()
+    public StatisticsTests()
     {
         _networkStats.Update(new NetworkStats("main", 1, 1, NetworkDifficulty, 0, "00", false, 1, true, 0, TestData.Now));
         _service = NewService();
@@ -29,7 +29,7 @@ public sealed class StatisticsServiceTests
 
     private readonly IBestShareListener _bestShareListener = Substitute.For<IBestShareListener>();
 
-    private StatisticsService NewService() => new(_networkStats, _time, [_bestShareListener], TestData.Options());
+    private StatisticsRig NewService() => new(_networkStats, _time, [_bestShareListener], TestData.Options());
 
     private void RecordOnBothPools()
     {
@@ -132,7 +132,7 @@ public sealed class StatisticsServiceTests
     [Fact]
     public void GIVEN_OnShare_WHEN_NetworkDifficultyUnknown_THEN_EffortIsZero()
     {
-        var service = new StatisticsService(new NetworkStatsStore(), _time, [], TestData.Options());
+        var service = new StatisticsRig(new NetworkStatsStore(), _time, [], TestData.Options());
         service.OnShare(TestData.Share("pplns"));
 
         Assert.Equal(0, service.GetPool(_pplns).Stats.EffortPercent);
@@ -219,7 +219,7 @@ public sealed class StatisticsServiceTests
         var repository = Substitute.For<IPoolHistoryRepository>();
         IReadOnlyList<PoolHistorySample>? stored = null;
         await repository.AddAsync(Arg.Do<IReadOnlyList<PoolHistorySample>>(s => stored = s), Arg.Any<CancellationToken>());
-        var sampler = new PoolHistorySampler(registry, _service, repository, _time, TestData.Options(o => o.HistorySampleMinutes = 3));
+        var sampler = new PoolHistorySampler(registry, _service.Reader, repository, _time, TestData.Options(o => o.HistorySampleMinutes = 3));
 
         await sampler.ExecuteAsync(CancellationToken.None);
 
@@ -235,7 +235,7 @@ public sealed class StatisticsServiceTests
     public async Task GIVEN_PoolHistorySampler_WHEN_NoPoolsExist_THEN_NothingIsStored()
     {
         var repository = Substitute.For<IPoolHistoryRepository>();
-        var sampler = new PoolHistorySampler(new PoolRegistry(), _service, repository, _time, TestData.Options());
+        var sampler = new PoolHistorySampler(new PoolRegistry(), _service.Reader, repository, _time, TestData.Options());
 
         await sampler.ExecuteAsync(CancellationToken.None);
 

@@ -9,7 +9,8 @@ public sealed partial class ShareProcessor(
     IJobSource jobSource,
     IShareValidator validator,
     IEnumerable<IShareObserver> shareObservers,
-    IBlockCandidateHandler blockHandler,
+    IBlockCandidateSubmitter blockSubmitter,
+    IFoundBlockRecorder blockRecorder,
     TimeProvider timeProvider,
     ILogger<ShareProcessor> logger) : IShareProcessor
 {
@@ -24,7 +25,7 @@ public sealed partial class ShareProcessor(
 
         // Nothing is allowed to come between solving a block and handing it to the node.
         var nodeVerdict = job is not null && validation.Block is { } block
-            ? await blockHandler.SubmitAsync(job, block).ConfigureAwait(false)
+            ? await blockSubmitter.SubmitAsync(job, block).ConfigureAwait(false)
             : null;
 
         var result = new ShareResult(
@@ -38,7 +39,7 @@ public sealed partial class ShareProcessor(
 
         if (nodeVerdict is not null)
         {
-            await blockHandler.RecordAsync(job!, validation.Block!, result, nodeVerdict, cancellationToken).ConfigureAwait(false);
+            await blockRecorder.RecordAsync(job!, validation.Block!, result, nodeVerdict, cancellationToken).ConfigureAwait(false);
         }
 
         return result;

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace HashForge.Mining.UnitTests.Payouts;
 
-public sealed class PayoutTrackerTests
+public sealed class PayoutTests
 {
     private readonly PoolRegistry _registry = new();
     private readonly NetworkStatsStore _networkStats = new();
@@ -14,13 +14,13 @@ public sealed class PayoutTrackerTests
     private readonly PoolDefinition _prop = TestData.Pool("prop", PayoutScheme.Prop, 1);
     private readonly PoolDefinition _solo = TestData.Pool("solo", PayoutScheme.Solo, 2);
 
-    public PayoutTrackerTests()
+    public PayoutTests()
     {
         _registry.TryAdd(_prop, out _);
         _registry.TryAdd(_solo, out _);
     }
 
-    private PayoutTracker Tracker() => new(_registry, new PayoutSchemeFactory(_time), _networkStats);
+    private PayoutRig Tracker() => new(_registry, new PayoutSchemeFactory(_time), _networkStats);
 
     [Fact]
     public void GIVEN_OnShare_WHEN_ShareIsAccepted_THEN_MinerGainsCreditedDifficulty()

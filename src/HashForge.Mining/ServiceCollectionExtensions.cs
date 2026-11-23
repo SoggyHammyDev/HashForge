@@ -34,7 +34,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IJobFactory, JobFactory>();
         services.AddSingleton<IShareValidator, ShareValidator>();
         services.AddSingleton<IShareProcessor, ShareProcessor>();
-        services.AddSingleton<IBlockCandidateHandler, BlockCandidateHandler>();
+        services.AddSingleton<IBlockCandidateSubmitter, ReliableBlockSubmitter>();
+        services.AddSingleton<IFoundBlockRecorder, FoundBlockRecorder>();
         services.AddSingleton<IHotStateCoordinator, HotStateCoordinator>();
 
         services.AddSingleton<JobManager>();
@@ -50,13 +51,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBestShareListener>(sp => sp.GetRequiredService<PoolEventNotifier>());
         services.AddSingleton<IBlockObserver>(sp => sp.GetRequiredService<PoolEventNotifier>());
 
-        services.AddSingleton<StatisticsService>();
-        services.AddSingleton<IStatisticsReader>(sp => sp.GetRequiredService<StatisticsService>());
-        services.AddObserver<StatisticsService>();
+        services.AddSingleton<IStatisticsStore, StatisticsStore>();
+        services.AddSingleton<IStatisticsReader, StatisticsReader>();
+        services.AddObserver<StatisticsRecorder>();
+        services.AddSingleton<IStatePersistable, StatisticsState>();
 
-        services.AddSingleton<PayoutTracker>();
-        services.AddSingleton<IPayoutPlanSource>(sp => sp.GetRequiredService<PayoutTracker>());
-        services.AddObserver<PayoutTracker>();
+        services.AddSingleton<IPayoutSchemeRegistry, PayoutSchemeRegistry>();
+        services.AddSingleton<IPayoutPlanSource, PayoutPlanSource>();
+        services.AddObserver<PayoutRecorder>();
+        services.AddSingleton<IStatePersistable, PayoutState>();
 
         services.AddSingleton<INodeReadiness, NodeReadiness>();
         services.AddSingleton<ITemplateRefresher, TemplateRefresher>();
@@ -74,11 +77,11 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Registers one singleton as a share observer, a block observer and a persisted-state participant.</summary>
+    /// <summary>Registers one singleton as both a share observer and a block observer.</summary>
     private static void AddObserver<T>(this IServiceCollection services)
-        where T : class, IShareObserver, IBlockObserver, IStatePersistable
+        where T : class, IShareObserver, IBlockObserver
     {
-        services.AddSingleton<IStatePersistable>(sp => sp.GetRequiredService<T>());
+        services.AddSingleton<T>();
         services.AddSingleton<IShareObserver>(sp => sp.GetRequiredService<T>());
         services.AddSingleton<IBlockObserver>(sp => sp.GetRequiredService<T>());
     }

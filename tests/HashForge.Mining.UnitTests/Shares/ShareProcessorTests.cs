@@ -21,13 +21,14 @@ public sealed class ShareProcessorTests
     private readonly IJobSource _jobs = Substitute.For<IJobSource>();
     private readonly IShareValidator _validator = Substitute.For<IShareValidator>();
     private readonly IShareObserver _shareObserver = Substitute.For<IShareObserver>();
-    private readonly IBlockCandidateHandler _blockHandlerStub = Substitute.For<IBlockCandidateHandler>();
+    private readonly IBlockCandidateSubmitter _submitterStub = Substitute.For<IBlockCandidateSubmitter>();
+    private readonly IFoundBlockRecorder _recorderStub = Substitute.For<IFoundBlockRecorder>();
     private readonly IBlockSubmitter _submitter = Substitute.For<IBlockSubmitter>();
     private readonly IBlockRepository _repository = Substitute.For<IBlockRepository>();
     private readonly IStatisticsReader _statistics = Substitute.For<IStatisticsReader>();
     private readonly IBlockObserver _blockObserver = Substitute.For<IBlockObserver>();
     private readonly ITemplateRefresher _refresher = Substitute.For<ITemplateRefresher>();
-    private readonly ILogger<BlockCandidateHandler> _handlerLogger = Substitute.For<ILogger<BlockCandidateHandler>>();
+    private readonly ILogger<ReliableBlockSubmitter> _handlerLogger = Substitute.For<ILogger<ReliableBlockSubmitter>>();
     private readonly FakeTimeProvider _time = new(TestData.Now);
     private readonly MiningJob _job = TestData.Job(TestData.Pool("solo", PayoutScheme.Solo));
 
@@ -37,15 +38,17 @@ public sealed class ShareProcessorTests
         _jobs.Find(_job.Id).Returns(_job);
         _validator.Validate(Arg.Any<ShareSubmission>(), _job).Returns(Accepted);
         _statistics.GetRoundEffortPercent(_job.Pool, TestData.MinerAddress).Returns(87.5);
-        _blockHandlerStub.SubmitAsync(_job, Candidate).Returns(NodeAccepted);
+        _submitterStub.SubmitAsync(_job, Candidate).Returns(NodeAccepted);
         _submitter.SubmitBlockAsync("beef", Arg.Any<CancellationToken>()).Returns(NodeAccepted);
     }
 
     private ShareProcessor Processor(params IShareObserver[] observers) =>
-        new(_jobs, _validator, observers.Length == 0 ? [_shareObserver] : observers, _blockHandlerStub, _time, NullLogger<ShareProcessor>.Instance);
+        new(_jobs, _validator, observers.Length == 0 ? [_shareObserver] : observers, _submitterStub, _recorderStub, _time, NullLogger<ShareProcessor>.Instance);
 
-    private BlockCandidateHandler Handler(params IBlockObserver[] observers) =>
-        new(_submitter, _repository, _statistics, observers.Length == 0 ? [_blockObserver] : observers, _refresher, _time, _handlerLogger);
+    private ReliableBlockSubmitter Submitter() => new(_submitter, _time, _handlerLogger);
+
+    private FoundBlockRecorder Recorder(params IBlockObserver[] observers) =>
+        new(_repository, _statistics, observers.Length == 0 ? [_blockObserver] : observers, _refresher, NullLogger<FoundBlockRecorder>.Instance);
 
     /// <summary>Moves the fake clock past each retry delay until the submission finishes.</summary>
     private async Task<BlockSubmissionResult> CompleteWithRetriesAsync(Task<BlockSubmissionResult> submitting)
@@ -73,7 +76,7 @@ public sealed class ShareProcessorTests
 
         Assert.Equal(new ShareResult("solo", TestData.Worker, ShareOutcome.Accepted, 64, 100, TestData.Now), result);
         _shareObserver.Received(1).OnShare(result);
-        await _blockHandlerStub.DidNotReceiveWithAnyArgs().SubmitAsync(default!, default!);
+        await _submitterStub.DidNotReceiveWithAnyArgs().SubmitAsync(default!, default!);
     }
 
     [Fact]
@@ -114,9 +117,9 @@ public sealed class ShareProcessorTests
 
         Received.InOrder(() =>
         {
-            _blockHandlerStub.SubmitAsync(_job, Candidate);
+            _submitterStub.SubmitAsync(_job, Candidate);
             _shareObserver.OnShare(result);
-            _blockHandlerStub.RecordAsync(_job, Candidate, result, NodeAccepted, Arg.Any<CancellationToken>());
+            _recorderStub.RecordAsync(_job, Candidate, result, NodeAccepted, Arg.Any<CancellationToken>());
         });
     }
 
@@ -131,13 +134,13 @@ public sealed class ShareProcessorTests
 
         Assert.True(result.IsAccepted);
         _shareObserver.Received(1).OnShare(result);
-        await _blockHandlerStub.Received(1).RecordAsync(_job, Candidate, result, NodeAccepted, Arg.Any<CancellationToken>());
+        await _recorderStub.Received(1).RecordAsync(_job, Candidate, result, NodeAccepted, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task GIVEN_SubmitAsync_WHEN_NodeAnswers_THEN_ReturnsItsVerdictWithoutUsingACancellableToken()
     {
-        var verdict = await Handler().SubmitAsync(_job, Candidate);
+        var verdict = await Submitter().SubmitAsync(_job, Candidate);
 
         Assert.Same(NodeAccepted, verdict);
         await _submitter.Received(1).SubmitBlockAsync("beef", CancellationToken.None);
@@ -149,7 +152,7 @@ public sealed class ShareProcessorTests
         _submitter.SubmitBlockAsync("beef", Arg.Any<CancellationToken>())
             .Returns(_ => throw new HttpRequestException("connection reset"), _ => NodeAccepted);
 
-        var verdict = await CompleteWithRetriesAsync(Handler().SubmitAsync(_job, Candidate));
+        var verdict = await CompleteWithRetriesAsync(Submitter().SubmitAsync(_job, Candidate));
 
         Assert.True(verdict.Accepted);
         await _submitter.Received(2).SubmitBlockAsync("beef", Arg.Any<CancellationToken>());
@@ -160,11 +163,11 @@ public sealed class ShareProcessorTests
     {
         _submitter.SubmitBlockAsync("beef", Arg.Any<CancellationToken>()).ThrowsAsync(new HttpRequestException("node down"));
 
-        var verdict = await CompleteWithRetriesAsync(Handler().SubmitAsync(_job, Candidate));
+        var verdict = await CompleteWithRetriesAsync(Submitter().SubmitAsync(_job, Candidate));
 
         Assert.False(verdict.Accepted);
         Assert.Contains("node down", verdict.RejectReason);
-        await _submitter.Received(BlockCandidateHandler.SubmitAttempts).SubmitBlockAsync("beef", Arg.Any<CancellationToken>());
+        await _submitter.Received(ReliableBlockSubmitter.SubmitAttempts).SubmitBlockAsync("beef", Arg.Any<CancellationToken>());
         var critical = Assert.Single(
             _handlerLogger.ReceivedCalls(),
             c => c.GetMethodInfo().Name == nameof(ILogger.Log) && (LogLevel)c.GetArguments()[0]! == LogLevel.Critical);
@@ -174,7 +177,7 @@ public sealed class ShareProcessorTests
     [Fact]
     public async Task GIVEN_RecordAsync_WHEN_NodeAcceptedBlock_THEN_BlockIsArchivedAnnouncedAndWorkRefreshed()
     {
-        await Handler().RecordAsync(_job, Candidate, Result(), NodeAccepted, CancellationToken.None);
+        await Recorder().RecordAsync(_job, Candidate, Result(), NodeAccepted, CancellationToken.None);
 
         var expected = ExpectedBlock();
         await _repository.Received(1).AddAsync(expected, Arg.Any<CancellationToken>());
@@ -185,7 +188,7 @@ public sealed class ShareProcessorTests
     [Fact]
     public async Task GIVEN_RecordAsync_WHEN_NodeRejectedBlock_THEN_BlockIsArchivedButNotAnnounced()
     {
-        await Handler().RecordAsync(_job, Candidate, Result(), new BlockSubmissionResult("high-hash"), CancellationToken.None);
+        await Recorder().RecordAsync(_job, Candidate, Result(), new BlockSubmissionResult("high-hash"), CancellationToken.None);
 
         await _repository.Received(1).AddAsync(ExpectedBlock(accepted: false, reason: "high-hash"), Arg.Any<CancellationToken>());
         await _blockObserver.DidNotReceiveWithAnyArgs().OnBlockFoundAsync(default!, default);
@@ -197,7 +200,7 @@ public sealed class ShareProcessorTests
     {
         _repository.AddAsync(Arg.Any<FoundBlock>(), Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("database down"));
 
-        await Handler().RecordAsync(_job, Candidate, Result(), NodeAccepted, CancellationToken.None);
+        await Recorder().RecordAsync(_job, Candidate, Result(), NodeAccepted, CancellationToken.None);
 
         await _blockObserver.Received(1).OnBlockFoundAsync(ExpectedBlock(), Arg.Any<CancellationToken>());
         await _refresher.Received(1).RefreshAsync(Arg.Any<CancellationToken>());
@@ -209,7 +212,7 @@ public sealed class ShareProcessorTests
         var failing = Substitute.For<IBlockObserver>();
         failing.OnBlockFoundAsync(Arg.Any<FoundBlock>(), Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("boom"));
 
-        await Handler(failing, _blockObserver).RecordAsync(_job, Candidate, Result(), NodeAccepted, CancellationToken.None);
+        await Recorder(failing, _blockObserver).RecordAsync(_job, Candidate, Result(), NodeAccepted, CancellationToken.None);
 
         await _blockObserver.Received(1).OnBlockFoundAsync(ExpectedBlock(), Arg.Any<CancellationToken>());
         await _refresher.Received(1).RefreshAsync(Arg.Any<CancellationToken>());
