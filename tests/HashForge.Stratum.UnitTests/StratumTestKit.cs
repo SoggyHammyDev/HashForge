@@ -85,5 +85,5 @@ internal static class StratumTestKit
         return StratumRequest.TryParse(line, out var request) ? request : throw new InvalidOperationException("Bad test request.");
     }
 
-    public static JsonElement Json(string text) => JsonDocument.Parse(text).RootElement.Clone();
+    public static JsonElement Json(string text) => JsonElement.Parse(text);
 }

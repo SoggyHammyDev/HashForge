@@ -21,12 +21,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          # The SDK version is pinned in global.json so CI and local builds run the same analyzers.
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore HashForge.sln
@@ -39,7 +40,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: test-results
@@ -50,7 +51,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build the pool image
         run: docker build --tag hashforge:ci .
