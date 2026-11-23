@@ -40,6 +40,9 @@ Core node, Redis, PostgreSQL and the pool itself.
   accepts it, and every miner is sent fresh work at once. A one-second poll runs alongside as a safety net.
 - **Work is always delivered in order.** Each miner connection tracks the newest work it has been sent, so a
   slower, older update can never overwrite a newer one, and a share on an out-of-date block is rejected as stale.
+- **Fresh transactions between blocks.** Every 30 seconds (`TEMPLATE_REFRESH_SECONDS`) miners are sent a new job
+  built from the node's latest template, so newly arrived transactions and their fees are included. Miners keep
+  their current work in flight; only a new block tells them to drop it.
 - **No work while the node is syncing.**
 
 **Statistics**

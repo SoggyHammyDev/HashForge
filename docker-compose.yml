@@ -84,6 +84,8 @@ services:
       Persistence__RedisConnectionString: redis:6379
       Persistence__PostgresConnectionString: Host=postgres;Database=hashforge;Username=${POSTGRES_USER:-hashforge};Password=${POSTGRES_PASSWORD}
       Mining__CoinbaseTag: ${COINBASE_TAG:-/HashForge/}
+      # Between blocks, how often miners get a new job that includes the latest transactions.
+      Mining__TemplateRefreshSeconds: ${TEMPLATE_REFRESH_SECONDS:-30}
       # The three built-in pools. Set any *_ENABLED to false to leave that pool off.
       Mining__Pools__0__Name: solo
       Mining__Pools__0__Scheme: Solo
