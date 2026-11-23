@@ -4,6 +4,7 @@
 @inject IPoolOverview Overview
 @inject INetworkStatsStore NetworkStats
 @inject IBlockRepository BlockRepository
+@inject ITemplateRefresher Templates
 
 <BrandTitle />
 
@@ -79,6 +80,8 @@
             <StatTile Icon="IconKind.Block" Label="Block height" Value="@Display.Count(_network.Height)" Hint="@_network.Chain" />
             <StatTile Icon="IconKind.Difficulty" Label="Difficulty" Value="@Display.Difficulty(_network.Difficulty)" />
             <StatTile Icon="IconKind.Network" Label="Network hashrate" Value="@Display.Hashrate(_network.NetworkHashrate)" />
+            <StatTile Icon="IconKind.Reward" Label="Block reward" Value="@(_reward is { } reward ? Display.Bitcoin(reward) : Display.None)" Hint="subsidy plus fees" />
+            <StatTile Icon="IconKind.Clock" Label="Last network block" Value="@Display.Age(_network.LastBlockAt, Now)" Hint="@Display.Shorten(_network.BestBlockHash)" />
         </section>
     }
 </SectionCard>
@@ -95,6 +98,7 @@
     private ShareTotals _totals = new(0, 0);
     private BestShare? _bestShare;
     private NetworkStats? _network;
+    private long? _reward;
 
     protected override async Task LoadAsync()
     {
@@ -102,6 +106,7 @@
         _totals = Overview.GetTotals();
         _bestShare = Overview.GetBestShare();
         _network = NetworkStats.Current;
+        _reward = Templates.Status.RewardSatoshis;
         _blocks = await BlockRepository.GetRecentAsync(RecentBlocksOnHome, Cancellation);
     }
 }

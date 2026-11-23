@@ -16,6 +16,10 @@ public sealed record ChainInfo
     [JsonPropertyName("bestblockhash")]
     public string BestBlockHash { get; init; } = string.Empty;
 
+    /// <summary>The timestamp of the newest block, in seconds since the Unix epoch.</summary>
+    [JsonPropertyName("time")]
+    public long Time { get; init; }
+
     [JsonPropertyName("difficulty")]
     public double Difficulty { get; init; }
 

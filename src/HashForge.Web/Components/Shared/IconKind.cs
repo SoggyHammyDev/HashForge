@@ -19,4 +19,5 @@ public enum IconKind
     Chain,
     Connections,
     Port,
+    Reward,
 }

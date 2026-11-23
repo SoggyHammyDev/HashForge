@@ -43,7 +43,7 @@ public sealed class NetworkStatsTests
         source.GetChainInfoAsync(Arg.Any<CancellationToken>()).Returns(new ChainInfo
         {
             Chain = "main", Blocks = 850_000, Headers = 850_001, BestBlockHash = "00ab", Difficulty = 9e13,
-            InitialBlockDownload = true, VerificationProgress = 0.5, Pruned = true, SizeOnDisk = 123,
+            InitialBlockDownload = true, VerificationProgress = 0.5, Pruned = true, SizeOnDisk = 123, Time = 1_700_000_000,
         });
         source.GetNetworkHashrateAsync(Arg.Any<CancellationToken>()).Returns(6e20);
         var store = new NetworkStatsStore();
@@ -52,7 +52,10 @@ public sealed class NetworkStatsTests
         await job.ExecuteAsync(CancellationToken.None);
 
         Assert.Equal(
-            new NetworkStats("main", 850_000, 850_001, 9e13, 6e20, "00ab", true, 0.5, true, 123, TestData.Now),
+            new NetworkStats("main", 850_000, 850_001, 9e13, 6e20, "00ab", true, 0.5, true, 123, TestData.Now)
+            {
+                LastBlockAt = DateTimeOffset.FromUnixTimeSeconds(1_700_000_000),
+            },
             store.Current);
         Assert.Equal(TimeSpan.FromSeconds(45), job.Interval);
         Assert.Equal("network-stats", job.Name);

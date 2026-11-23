@@ -1,6 +1,7 @@
 using Bunit;
 using HashForge.Domain;
 using HashForge.Mining.History;
+using HashForge.Mining.Jobs;
 using HashForge.Mining.Network;
 using HashForge.Mining.Pools;
 using HashForge.Mining.Shares;
@@ -42,6 +43,8 @@ public abstract class WebTestContext : BunitContext
         Services.AddSingleton(Provisioner);
         Services.AddSingleton(Registry);
         Services.AddSingleton(AdminAccess);
+        Templates.Status.Returns(new TemplateStatus(null, DateTimeOffset.MinValue));
+        Services.AddSingleton(Templates);
     }
 
     protected FakeTimeProvider Time { get; } = new(Now);
@@ -66,6 +69,8 @@ public abstract class WebTestContext : BunitContext
 
     protected IPoolRegistry Registry { get; } = Substitute.For<IPoolRegistry>();
 
+    protected ITemplateRefresher Templates { get; } = Substitute.For<ITemplateRefresher>();
+
     protected IAdminAccessPolicy AdminAccess { get; } = Substitute.For<IAdminAccessPolicy>();
 
     protected static StatsSnapshot Stats(long accepted = 120, long rejected = 3, double hashrate = 2.5e12, double effort = 42.5, BestShare? best = null) =>
@@ -78,7 +83,7 @@ public abstract class WebTestContext : BunitContext
         new() { Name = name, Scheme = scheme, Port = port, FeeAddress = "bc1qfee", FeePercent = 1.5m };
 
     protected static NetworkStats Network(bool synced = true) =>
-        new("main", 850_000, synced ? 850_000 : 900_000, 9.2e13, 6.5e20, "00ab", !synced, synced ? 1 : 0.5, true, 12_000_000_000, Now.AddSeconds(-10));
+        new("main", 850_000, synced ? 850_000 : 900_000, 9.2e13, 6.5e20, "00ab", !synced, synced ? 1 : 0.5, true, 12_000_000_000, Now.AddSeconds(-10)) { LastBlockAt = Now.AddMinutes(-4) };
 
     protected static FoundBlock Block(bool accepted = true) => new(
         "pplns", PayoutScheme.Pplns, 850_001, new string('a', 64), new WorkerIdentity("bc1qalicealicealicealice", "rig1"),

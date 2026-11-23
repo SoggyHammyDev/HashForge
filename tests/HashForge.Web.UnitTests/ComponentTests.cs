@@ -1,7 +1,9 @@
 using System.Net;
 using Bunit;
 using HashForge.Domain;
+using HashForge.Domain.Formatting;
 using HashForge.Mining.History;
+using HashForge.Mining.Jobs;
 using HashForge.Mining.Pools;
 using HashForge.Mining.Statistics;
 using HashForge.Stratum.Sessions;
@@ -119,6 +121,7 @@ public sealed class ComponentTests : WebTestContext
         Overview.GetBestShare().Returns(new BestShare(7.7e12, "bc1qbob.s21", Now));
         NetworkStats.Current.Returns(Network());
         Blocks.GetRecentAsync(5, Arg.Any<CancellationToken>()).Returns([Block()]);
+        Templates.Status.Returns(new TemplateStatus("00ab", Now) { RewardSatoshis = 312_600_000 });
 
         var home = Render<Home>();
 
@@ -129,6 +132,10 @@ public sealed class ComponentTests : WebTestContext
         Assert.Contains("bc1qbob.s21", home.Markup);
         Assert.Contains("850,000", home.Markup);
         Assert.Contains("650 EH/s", home.Markup);
+        Assert.Contains("3.12600000 BTC", home.Markup);
+        Assert.Contains("subsidy plus fees", home.Markup);
+        Assert.Contains("Last network block", home.Markup);
+        Assert.Contains("4m ago", home.Markup);
         Assert.Contains("850001", home.Markup);
         Assert.Empty(home.FindAll(".notice"));
     }
@@ -637,5 +644,16 @@ public sealed class ComponentTests : WebTestContext
         Assert.Equal("Hashrate", tile.Find(".tile-label").TextContent);
         Assert.Single(card.FindAll("h2 svg.icon"));
         Assert.Equal("Pools", card.Find("h2").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_Home_WHEN_NoWorkHasBeenFetchedYet_THEN_BlockRewardShowsADash()
+    {
+        NetworkStats.Current.Returns(Network());
+
+        var home = Render<Home>();
+
+        var reward = home.FindAll(".tile").Single(t => t.TextContent.Contains("Block reward"));
+        Assert.Equal(Display.None, reward.QuerySelector(".tile-value")!.TextContent);
     }
 }

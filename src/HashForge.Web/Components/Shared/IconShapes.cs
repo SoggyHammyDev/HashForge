@@ -22,6 +22,7 @@ public static class IconShapes
         [IconKind.Storage] = """<ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/>""",
         [IconKind.Chain] = """<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>""",
         [IconKind.Connections] = """<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>""",
+        [IconKind.Reward] = """<circle cx="12" cy="12" r="9"/><path d="M10 8h3a2 2 0 0 1 0 4h-3zM10 12h3.5a2 2 0 0 1 0 4H10zM10 8v8M11.5 6.5V8M11.5 16v1.5"/>""",
         [IconKind.Port] = """<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="7 10 10 12.5 7 15"/><path d="M12.5 15H17"/>""",
     };
 

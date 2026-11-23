@@ -17,6 +17,9 @@ public sealed record NetworkStats(
     /// <summary>The chain name Bitcoin Core reports for a local regression-test network.</summary>
     public const string RegtestChain = "regtest";
 
+    /// <summary>When the newest block on the network was mined, if the node reported it.</summary>
+    public DateTimeOffset? LastBlockAt { get; init; }
+
     public bool IsSynced => !InitialBlockDownload && Height >= Headers;
 
     /// <summary>How far through verifying the chain the node is, from 0 to 100.</summary>

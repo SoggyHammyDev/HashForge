@@ -31,6 +31,9 @@ public sealed class NetworkStatsJob(
             info.VerificationProgress,
             info.Pruned,
             info.SizeOnDisk,
-            timeProvider.GetUtcNow()));
+            timeProvider.GetUtcNow())
+        {
+            LastBlockAt = info.Time > 0 ? DateTimeOffset.FromUnixTimeSeconds(info.Time) : null,
+        });
     }
 }
