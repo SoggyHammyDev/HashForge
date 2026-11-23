@@ -138,4 +138,41 @@ public sealed class PoolLifecycleTests
 
         Assert.Equal("good", Assert.Single(_registry.Pools).Name);
     }
-}
+
+    [Fact]
+    public async Task GIVEN_StartAsync_WHEN_PoolHasZeroFeeAndNoFeeAddress_THEN_ItStartsWithoutAskingTheNode()
+    {
+        await Bootstrap(TestData.Pool("free") with { FeePercent = 0, FeeAddress = "" }).StartAsync(CancellationToken.None);
+
+        Assert.Equal("free", Assert.Single(_registry.Pools).Name);
+        await _resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task GIVEN_AddAsync_WHEN_PoolHasZeroFeeAndNoFeeAddress_THEN_ItIsStartedWithoutAskingTheNode()
+    {
+        var result = await _provisioner.AddAsync(TestData.Pool("free") with { FeePercent = 0, FeeAddress = "" }, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        await _resolver.DidNotReceiveWithAnyArgs().ResolveAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task GIVEN_AddAsync_WHEN_PoolChargesAFeeButHasNoAddress_THEN_ItIsRefused()
+    {
+        var result = await _provisioner.AddAsync(TestData.Pool("paid") with { FeePercent = 1, FeeAddress = "" }, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("fee address is required", result.Error);
+    }
+
+    [Fact]
+    public async Task GIVEN_FindProblemAsync_WHEN_NodeRejectsAddressWithoutReason_THEN_ReturnsDefaultReason()
+    {
+        _resolver.ResolveAsync("odd", Arg.Any<CancellationToken>()).Returns(new AddressResolution(false, null, null));
+
+        var problem = await _resolver.FindProblemAsync(TestData.Pool() with { FeeAddress = "odd" }, CancellationToken.None);
+
+        Assert.Equal(AddressResolution.DefaultError, problem);
+        Assert.Null(await _resolver.FindProblemAsync(TestData.Pool(), CancellationToken.None));
+    }}

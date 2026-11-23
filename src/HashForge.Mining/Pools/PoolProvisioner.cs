@@ -21,10 +21,10 @@ public sealed partial class PoolProvisioner(
             return ProvisionResult.Failure(definitionError);
         }
 
-        var address = await addressResolver.ResolveAsync(pool.FeeAddress, cancellationToken).ConfigureAwait(false);
-        if (!address.IsValid)
+        var feeProblem = await addressResolver.FindProblemAsync(pool, cancellationToken).ConfigureAwait(false);
+        if (feeProblem is not null)
         {
-            return ProvisionResult.Failure($"Fee address rejected by the node: {address.Error}");
+            return ProvisionResult.Failure($"Fee address rejected by the node: {feeProblem}");
         }
 
         if (!registry.TryAdd(pool, out var error))

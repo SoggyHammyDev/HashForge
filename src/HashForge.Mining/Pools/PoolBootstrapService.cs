@@ -33,10 +33,10 @@ public sealed partial class PoolBootstrapService(
             }
 
             // A fee address the node will not pay to would break every job, so the pool is refused up front.
-            var feeAddress = await addressResolver.ResolveAsync(pool.FeeAddress, cancellationToken).ConfigureAwait(false);
-            if (!feeAddress.IsValid)
+            var feeProblem = await addressResolver.FindProblemAsync(pool, cancellationToken).ConfigureAwait(false);
+            if (feeProblem is not null)
             {
-                LogPoolRefused(pool.Name, pool.FeeAddress, feeAddress.Error);
+                LogPoolRefused(pool.Name, pool.FeeAddress, feeProblem);
             }
             else if (registry.TryAdd(pool, out var error))
             {

@@ -108,4 +108,21 @@ public sealed class PoolValidationTests
         Assert.Contains(PoolDefinitionValidator.Validate(pool), e => e.Contains("finder bonus"));
         Assert.Empty(PoolDefinitionValidator.Validate(TestData.Pool(scheme: PayoutScheme.Prop) with { FinderBonusSatoshis = 0 }));
     }
-}
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GIVEN_Validate_WHEN_FeeIsZero_THEN_FeeAddressMayBeLeftEmpty(string feeAddress)
+    {
+        var pool = TestData.Pool() with { FeePercent = 0, FeeAddress = feeAddress };
+
+        Assert.Empty(PoolDefinitionValidator.Validate(pool));
+    }
+
+    [Fact]
+    public void GIVEN_Validate_WHEN_FeeIsAboveZeroWithNoAddress_THEN_ErrorSaysWhyAddressIsNeeded()
+    {
+        var pool = TestData.Pool() with { FeePercent = 0.5m, FeeAddress = "" };
+
+        Assert.Contains(PoolDefinitionValidator.Validate(pool), e => e.Contains("required when the fee is above zero"));
+    }}

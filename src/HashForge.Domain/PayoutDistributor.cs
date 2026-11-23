@@ -8,7 +8,9 @@ public static class PayoutDistributor
     /// <summary>
     /// Returns payouts that always sum to <paramref name="rewardSatoshis"/>. Miners beyond the output cap or
     /// below the minimum payout are dropped and their portion is shared between the remaining miners.
+    /// The fee address never receives more than the fee: anything that cannot be split goes to a miner.
     /// </summary>
+    /// <exception cref="ArgumentException">There is reward to pay out but no miner to pay it to.</exception>
     public static IReadOnlyList<PayoutEntry> Distribute(
         IReadOnlyDictionary<string, double> weights,
         long rewardSatoshis,
@@ -19,20 +21,57 @@ public static class PayoutDistributor
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentOutOfRangeException.ThrowIfNegative(rewardSatoshis);
 
-        var fee = (long)Math.Floor(rewardSatoshis * rules.FeePercent / PercentScale);
+        var fee = FeeFor(rewardSatoshis, rules);
         var bonus = finderBonus is null ? 0 : Math.Clamp(finderBonus.Satoshis, 0, rewardSatoshis - fee);
         var distributable = rewardSatoshis - fee - bonus;
 
-        // The finder may need an output of their own, so one slot is held back for them when a bonus applies.
-        var minerPayouts = SplitBetweenMiners(weights, distributable, rules, reservedSlots: bonus > 0 ? 2 : 1);
-        if (bonus > 0)
+        // The fee and the finder's bonus may each need an output of their own, so a slot is held back for each.
+        var reservedSlots = (fee > 0 ? 1 : 0) + (bonus > 0 ? 1 : 0);
+        var payouts = SplitBetweenMiners(weights, distributable, rules, reservedSlots);
+        if (payouts.Count == 0 && distributable > 0)
         {
-            AddTo(minerPayouts, finderBonus!.Address, bonus);
+            payouts = PayLargestMiner(weights, distributable);
         }
 
-        var poolAmount = rewardSatoshis - minerPayouts.Sum(p => p.Satoshis);
+        if (bonus > 0)
+        {
+            Credit(payouts, finderBonus!.Address, bonus, atFront: true);
+        }
 
-        return MergePoolAmount(minerPayouts, poolAmount, rules);
+        var forMiners = rewardSatoshis - fee;
+        if (payouts.Count == 0 && forMiners > 0)
+        {
+            throw new ArgumentException("There is reward to pay out but no miner with any weight to pay it to.", nameof(weights));
+        }
+
+        // Whatever rounding or the minimum payout left unassigned belongs to the miners, not the pool.
+        var unassigned = forMiners - payouts.Sum(p => p.Satoshis);
+        if (unassigned > 0)
+        {
+            payouts[0] = payouts[0] with { Satoshis = payouts[0].Satoshis + unassigned };
+        }
+
+        if (fee > 0)
+        {
+            Credit(payouts, rules.FeeAddress, fee, atFront: false);
+        }
+
+        return payouts;
+    }
+
+    /// <summary>
+    /// The pool's fee, or zero when there is no fee address or the fee is too small to be worth an output of
+    /// its own, in which case the miners keep it.
+    /// </summary>
+    private static long FeeFor(long rewardSatoshis, PayoutRules rules)
+    {
+        if (string.IsNullOrWhiteSpace(rules.FeeAddress))
+        {
+            return 0;
+        }
+
+        var fee = (long)Math.Floor(rewardSatoshis * rules.FeePercent / PercentScale);
+        return fee >= rules.MinimumPayoutSatoshis ? fee : 0;
     }
 
     private static List<PayoutEntry> SplitBetweenMiners(
@@ -42,12 +81,7 @@ public static class PayoutDistributor
         int reservedSlots)
     {
         var minerSlots = Math.Max(rules.MaxOutputs - reservedSlots, 0);
-        var eligible = weights
-            .Where(w => w.Value > 0)
-            .OrderByDescending(w => w.Value)
-            .ThenBy(w => w.Key, StringComparer.Ordinal)
-            .Take(minerSlots)
-            .ToList();
+        var eligible = ByWeight(weights).Take(minerSlots).ToList();
 
         while (eligible.Count > 0)
         {
@@ -68,36 +102,30 @@ public static class PayoutDistributor
         return [];
     }
 
-    /// <summary>Adds an amount to an address's payout, creating the payout at the front when there is none.</summary>
-    private static void AddTo(List<PayoutEntry> payouts, string address, long satoshis)
+    /// <summary>
+    /// Used when no miner's cut clears the minimum payout: rather than the pool keeping the reward, the miner
+    /// who did the most work is paid all of it.
+    /// </summary>
+    private static List<PayoutEntry> PayLargestMiner(IReadOnlyDictionary<string, double> weights, long satoshis) =>
+        [.. ByWeight(weights).Take(1).Select(w => new PayoutEntry(w.Key, satoshis))];
+
+    /// <summary>Miners with any weight, largest first, with ties broken by address so the result is repeatable.</summary>
+    private static IEnumerable<KeyValuePair<string, double>> ByWeight(IReadOnlyDictionary<string, double> weights) =>
+        weights
+            .Where(w => w.Value > 0)
+            .OrderByDescending(w => w.Value)
+            .ThenBy(w => w.Key, StringComparer.Ordinal);
+
+    /// <summary>Adds an amount to an address's payout, creating the payout when there is none.</summary>
+    private static void Credit(List<PayoutEntry> payouts, string address, long satoshis, bool atFront)
     {
         var existing = payouts.FindIndex(p => p.Address == address);
-        if (existing < 0)
+        if (existing >= 0)
         {
-            payouts.Insert(0, new PayoutEntry(address, satoshis));
+            payouts[existing] = payouts[existing] with { Satoshis = payouts[existing].Satoshis + satoshis };
             return;
         }
 
-        payouts[existing] = payouts[existing] with { Satoshis = payouts[existing].Satoshis + satoshis };
-    }
-
-    private static List<PayoutEntry> MergePoolAmount(List<PayoutEntry> minerPayouts, long poolAmount, PayoutRules rules)
-    {
-        if (poolAmount == 0)
-        {
-            return minerPayouts;
-        }
-
-        var existing = minerPayouts.FindIndex(p => p.Address == rules.FeeAddress);
-        var isDust = poolAmount < rules.MinimumPayoutSatoshis && minerPayouts.Count > 0;
-        var target = existing >= 0 ? existing : isDust ? 0 : -1;
-        if (target < 0)
-        {
-            minerPayouts.Add(new PayoutEntry(rules.FeeAddress, poolAmount));
-            return minerPayouts;
-        }
-
-        minerPayouts[target] = minerPayouts[target] with { Satoshis = minerPayouts[target].Satoshis + poolAmount };
-        return minerPayouts;
+        payouts.Insert(atFront ? 0 : payouts.Count, new PayoutEntry(address, satoshis));
     }
 }

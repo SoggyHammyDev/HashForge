@@ -19,7 +19,9 @@ Core node, Redis, PostgreSQL and the pool itself.
   holds anyone's funds, so there is no wallet to secure and no withdrawal process.
 - **Four payout schemes**, each on its own Stratum port, in any combination:
   SOLO, PROP, PPLNS and BONUS (the block finder gets a fixed bonus, 1 BTC by default, and the rest is split).
-- **Pool fee** per pool, paid to an address you choose.
+- **Pool fee** per pool, from 0% upwards, paid to an address you choose. The fee address receives the fee and
+  nothing else: any reward that cannot be split exactly goes to a miner, never to the pool. A pool with no
+  fee needs no fee address at all.
 - **Start and stop pools while running** from the admin page. Pools started there survive a restart.
 
 **Mining (Stratum V1)**
@@ -87,7 +89,7 @@ Edit `.env` and set at least:
 | Setting | What to put |
 |---|---|
 | `RPC_PASSWORD`, `POSTGRES_PASSWORD` | Long random values |
-| `POOL_FEE_ADDRESS` | A Bitcoin address you control, on the network you chose |
+| `POOL_FEE_ADDRESS` | A Bitcoin address you control, on the network you chose. Leave it empty only if you set every enabled pool's `*_FEE_PERCENT` to `0`. |
 | `STRATUM_HOST` | The host name or IP address miners will use to reach this machine |
 | `NETWORK` | `mainnet`, `testnet4`, `signet` or `regtest` |
 
@@ -154,6 +156,13 @@ Because miners are paid in the coinbase itself, two limits apply:
   are left out and their portion is shared between the rest.
 - A payout below the minimum (10,000 satoshis by default) is not made; that portion is shared between the
   other miners. In PPLNS such a miner stays in the window for later blocks; in PROP they miss that round.
+- If no miner's cut clears the minimum, the miner who did the most work is paid, rather than the pool.
+- A fee too small to be worth an output of its own (below the minimum payout) is left with the miners.
+
+**The pool operator can never receive more than the stated fee.** Rounding remainders and anything else that
+cannot be divided go to miners. To run a pool with no fee, set its `*_FEE_PERCENT` to `0`; if every enabled
+pool is fee-free, `POOL_FEE_ADDRESS` can be left empty. A pool that charges a fee without a fee address is
+refused at startup.
 
 When a PROP or PPLNS pool has no share history at all (a brand-new pool, or the moment after a PROP round
 ends), there is nobody to split with, so a block found then is paid to the miner who found it. Payout

@@ -21,7 +21,7 @@ public static partial class PoolDefinitionValidator
         AddIf(errors, pool.Name is null || !NamePattern().IsMatch(pool.Name), "Pool name must be 1-32 lowercase letters, digits or hyphens.");
         AddIf(errors, pool.Port is < MinPort or > MaxPort, $"{label}: port must be between {MinPort} and {MaxPort}.");
         AddIf(errors, pool.FeePercent is < 0 or > MaxFeePercent, $"{label}: fee must be between 0 and {MaxFeePercent} percent.");
-        AddIf(errors, string.IsNullOrWhiteSpace(pool.FeeAddress), $"{label}: a fee address is required.");
+        AddIf(errors, pool.HasFee && string.IsNullOrWhiteSpace(pool.FeeAddress), $"{label}: a fee address is required when the fee is above zero.");
         AddIf(errors, pool.MaxCoinbaseOutputs < 1, $"{label}: at least one coinbase output is required.");
         AddIf(errors, pool.MinimumPayoutSatoshis < DustLimitSatoshis, $"{label}: minimum payout must be at least {DustLimitSatoshis} satoshis.");
         AddIf(errors, pool.PplnsWindowMultiplier <= 0, $"{label}: the PPLNS window multiplier must be greater than zero.");

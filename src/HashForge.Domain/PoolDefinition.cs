@@ -18,8 +18,10 @@ public sealed record PoolDefinition
 
     public decimal FeePercent { get; init; }
 
-    /// <summary>Receives the pool fee and any reward that cannot be paid to miners.</summary>
-    public required string FeeAddress { get; init; }
+    /// <summary>Receives the pool fee, and nothing else. May be left empty when the fee is zero.</summary>
+    public string FeeAddress { get; init; } = string.Empty;
+
+    public bool HasFee => FeePercent > 0;
 
     /// <summary>The PPLNS window size as a multiple of network difficulty.</summary>
     public double PplnsWindowMultiplier { get; init; } = DefaultPplnsWindowMultiplier;

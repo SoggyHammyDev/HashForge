@@ -92,13 +92,14 @@ services:
       Mining__Pools__0__Enabled: ${SOLO_ENABLED:-true}
       Mining__Pools__0__Port: ${SOLO_PORT:-3333}
       Mining__Pools__0__FeePercent: ${SOLO_FEE_PERCENT:-1}
-      Mining__Pools__0__FeeAddress: ${POOL_FEE_ADDRESS:?set POOL_FEE_ADDRESS in .env}
+      # Required when a pool charges a fee; may be left empty if every enabled pool has a fee of 0.
+      Mining__Pools__0__FeeAddress: ${POOL_FEE_ADDRESS:-}
       Mining__Pools__1__Name: pplns
       Mining__Pools__1__Scheme: Pplns
       Mining__Pools__1__Enabled: ${PPLNS_ENABLED:-true}
       Mining__Pools__1__Port: ${PPLNS_PORT:-3334}
       Mining__Pools__1__FeePercent: ${PPLNS_FEE_PERCENT:-1}
-      Mining__Pools__1__FeeAddress: ${POOL_FEE_ADDRESS}
+      Mining__Pools__1__FeeAddress: ${POOL_FEE_ADDRESS:-}
       Mining__Pools__1__PplnsWindowMultiplier: ${PPLNS_WINDOW_MULTIPLIER:-2}
       Mining__Pools__1__MaxCoinbaseOutputs: ${MAX_COINBASE_OUTPUTS:-500}
       Mining__Pools__2__Name: prop
@@ -106,7 +107,7 @@ services:
       Mining__Pools__2__Enabled: ${PROP_ENABLED:-true}
       Mining__Pools__2__Port: ${PROP_PORT:-3335}
       Mining__Pools__2__FeePercent: ${PROP_FEE_PERCENT:-1}
-      Mining__Pools__2__FeeAddress: ${POOL_FEE_ADDRESS}
+      Mining__Pools__2__FeeAddress: ${POOL_FEE_ADDRESS:-}
       Mining__Pools__2__MaxCoinbaseOutputs: ${MAX_COINBASE_OUTPUTS:-500}
       # Optional fourth pool: the block finder gets a fixed bonus, the rest is split like PROP.
       Mining__Pools__3__Name: bonus
@@ -114,7 +115,7 @@ services:
       Mining__Pools__3__Enabled: ${BONUS_ENABLED:-false}
       Mining__Pools__3__Port: ${BONUS_PORT:-3336}
       Mining__Pools__3__FeePercent: ${BONUS_FEE_PERCENT:-1}
-      Mining__Pools__3__FeeAddress: ${POOL_FEE_ADDRESS}
+      Mining__Pools__3__FeeAddress: ${POOL_FEE_ADDRESS:-}
       Mining__Pools__3__FinderBonusSatoshis: ${BONUS_FINDER_SATOSHIS:-100000000}
       Mining__Pools__3__MaxCoinbaseOutputs: ${MAX_COINBASE_OUTPUTS:-500}
       Stratum__InitialDifficulty: ${STRATUM_INITIAL_DIFFICULTY:-1024}

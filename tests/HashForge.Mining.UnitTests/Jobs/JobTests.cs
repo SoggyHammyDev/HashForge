@@ -292,4 +292,15 @@ public sealed class JobTests
         Assert.Null(manager.Find("1"));
         Assert.Null(manager.Find("late"));
     }
-}
+
+    [Fact]
+    public async Task GIVEN_CreateAsync_WHEN_PoolHasZeroFeeAndNoFeeAddress_THEN_CoinbasePaysOnlyTheMiner()
+    {
+        var pool = TestData.Pool("free", PayoutScheme.Solo, 4) with { FeePercent = 0, FeeAddress = "" };
+
+        var job = await Factory().CreateAsync(new JobIdentity("1", 1), pool, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
+
+        Assert.Equal([new PayoutEntry(TestData.MinerAddress, 312_500_000)], job.Payouts);
+        Assert.Equal(1, job.MinersPaid);
+        await _resolver.DidNotReceive().ResolveAsync(string.Empty, Arg.Any<CancellationToken>());
+    }}

@@ -85,7 +85,7 @@
         {
             <label>Finder bonus (BTC) <InputNumber id="finder-bonus" @bind-Value="_form.FinderBonusBitcoin" step="0.01" min="0" /></label>
         }
-        <label>Fee address <InputText @bind-Value="_form.FeeAddress" placeholder="bc1q…" /></label>
+        <label>Fee address <InputText @bind-Value="_form.FeeAddress" placeholder="@(_form.FeePercent > 0 ? "bc1q…" : "not needed at 0% fee")" /></label>
         <button type="submit">Start pool</button>
     </EditForm>
     @if (_message is not null)
