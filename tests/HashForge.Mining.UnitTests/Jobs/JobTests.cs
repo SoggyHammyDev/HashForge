@@ -22,7 +22,7 @@ public sealed class JobTests
         _weights.GetPlan(Arg.Any<PoolDefinition>(), Arg.Any<string>()).Returns(new PayoutPlan(new Dictionary<string, double> { [TestData.MinerAddress] = 1 }));
         _weights.IsMinerSpecific(Arg.Any<PoolDefinition>()).Returns(call => call.Arg<PoolDefinition>().Scheme == PayoutScheme.Solo);
         _factoryStub.CreateAsync(default!, default!, default!, default!, default)
-            .ReturnsForAnyArgs(call => TestData.Job(call.Arg<PoolDefinition>(), call.Arg<BlockTemplate>(), call.ArgAt<string>(0)));
+            .ReturnsForAnyArgs(call => TestData.Job(call.Arg<PoolDefinition>(), call.Arg<BlockTemplate>(), call.Arg<JobIdentity>()?.Id ?? "none", call.Arg<JobIdentity>()?.TemplateSequence ?? 0));
     }
 
     private JobFactory Factory() => new(_weights, _resolver, TestData.Options());
@@ -55,7 +55,7 @@ public sealed class JobTests
     {
         var template = TestData.Template();
 
-        var job = await Factory().CreateAsync("7", _shared, template, TestData.MinerAddress, CancellationToken.None);
+        var job = await Factory().CreateAsync(new JobIdentity("7", 1), _shared, template, TestData.MinerAddress, CancellationToken.None);
 
         Assert.Equal("7", job.Id);
         Assert.Equal(
@@ -72,7 +72,7 @@ public sealed class JobTests
     {
         _weights.GetPlan(Arg.Any<PoolDefinition>(), Arg.Any<string>()).Returns(new PayoutPlan(new Dictionary<string, double> { [TestData.MinerAddress] = 1, [TestData.FeeAddress] = 1 }));
 
-        var job = await Factory().CreateAsync("1", _shared, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
+        var job = await Factory().CreateAsync(new JobIdentity("1", 1), _shared, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
 
         Assert.Equal(2, job.Payouts.Count);
         Assert.Equal(2, job.MinersPaid);
@@ -89,7 +89,7 @@ public sealed class JobTests
     {
         var template = TestData.Template(witnessCommitment: "6a24aa21a9ed");
 
-        var job = await Factory().CreateAsync("1", _shared, template, TestData.MinerAddress, CancellationToken.None);
+        var job = await Factory().CreateAsync(new JobIdentity("1", 1), _shared, template, TestData.MinerAddress, CancellationToken.None);
 
         Assert.Contains("0000000000000000" + "06" + "6a24aa21a9ed", Convert.ToHexStringLower(job.Coinbase.Suffix));
     }
@@ -97,7 +97,7 @@ public sealed class JobTests
     [Fact]
     public async Task GIVEN_CreateAsync_WHEN_Called_THEN_WeightsAreRequestedForThatMiner()
     {
-        await Factory().CreateAsync("1", _solo, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
+        await Factory().CreateAsync(new JobIdentity("1", 1), _solo, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
 
         _weights.Received(1).GetPlan(_solo, TestData.MinerAddress);
     }
@@ -108,7 +108,7 @@ public sealed class JobTests
         _resolver.ResolveAsync(TestData.FeeAddress, Arg.Any<CancellationToken>()).Returns(new AddressResolution(false, null, "bad checksum"));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => Factory().CreateAsync("1", _shared, TestData.Template(), TestData.MinerAddress, CancellationToken.None));
+            () => Factory().CreateAsync(new JobIdentity("1", 1), _shared, TestData.Template(), TestData.MinerAddress, CancellationToken.None));
 
         Assert.Contains("bad checksum", exception.Message);
     }
@@ -221,7 +221,7 @@ public sealed class JobTests
             new Dictionary<string, double> { [TestData.MinerAddress] = 1, ["other"] = 1 },
             new FinderBonus(TestData.MinerAddress, 100_000_000)));
 
-        var job = await Factory().CreateAsync("1", pool, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
+        var job = await Factory().CreateAsync(new JobIdentity("1", 1), pool, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
 
         // 3.125 BTC: 1 BTC bonus to the finder, then 2.125 BTC split evenly.
         Assert.Equal(
@@ -235,7 +235,7 @@ public sealed class JobTests
     {
         var pool = TestData.Pool("prop", PayoutScheme.Prop, 3) with { FinderBonusSatoshis = 100_000_000, FeePercent = 0 };
 
-        var job = await Factory().CreateAsync("1", pool, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
+        var job = await Factory().CreateAsync(new JobIdentity("1", 1), pool, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
 
         Assert.Equal([new PayoutEntry(TestData.MinerAddress, 312_500_000)], job.Payouts);
     }
@@ -247,7 +247,7 @@ public sealed class JobTests
         _factoryStub.CreateAsync(default!, default!, default!, default!, default).ReturnsForAnyArgs(call =>
             Interlocked.Increment(ref attempts) == 1
                 ? Task.FromException<MiningJob>(new HttpRequestException("node hiccup"))
-                : Task.FromResult(TestData.Job(call.Arg<PoolDefinition>(), call.Arg<BlockTemplate>(), call.ArgAt<string>(0))));
+                : Task.FromResult(TestData.Job(call.Arg<PoolDefinition>(), call.Arg<BlockTemplate>(), call.Arg<JobIdentity>()?.Id ?? "none", call.Arg<JobIdentity>()?.TemplateSequence ?? 0)));
         var manager = new JobManager(_factoryStub, _weights);
         manager.Publish(TestData.Template());
 
@@ -256,5 +256,40 @@ public sealed class JobTests
 
         Assert.NotNull(job);
         Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task GIVEN_Publish_WHEN_TemplatesArrive_THEN_EachJobCarriesAHigherSequenceThanTheLast()
+    {
+        var manager = new JobManager(_factoryStub, _weights);
+
+        manager.Publish(TestData.Template());
+        var first = await manager.GetCurrentJobAsync(_shared, "a", CancellationToken.None);
+        manager.Publish(TestData.Template());
+        var second = await manager.GetCurrentJobAsync(_shared, "a", CancellationToken.None);
+        manager.Publish(TestData.Template(previousBlockHash: new string('3', 64)));
+        var third = await manager.GetCurrentJobAsync(_shared, "a", CancellationToken.None);
+
+        Assert.True(first!.TemplateSequence < second!.TemplateSequence);
+        Assert.True(second.TemplateSequence < third!.TemplateSequence);
+    }
+
+    [Fact]
+    public async Task GIVEN_Find_WHEN_JobFinishesBuildingAfterANewBlockArrived_THEN_ItIsNeverReturnedAsValid()
+    {
+        var building = new TaskCompletionSource<MiningJob>();
+        var oldTemplate = TestData.Template();
+        _factoryStub.CreateAsync(default!, default!, default!, default!, default).ReturnsForAnyArgs(building.Task);
+        var manager = new JobManager(_factoryStub, _weights);
+        manager.Publish(oldTemplate);
+        var pending = manager.GetCurrentJobAsync(_shared, "a", CancellationToken.None);
+
+        manager.Publish(TestData.Template(previousBlockHash: new string('4', 64)));
+        building.SetResult(TestData.Job(_shared, oldTemplate, "late", 1));
+        await pending;
+
+        // The manager files jobs under the ids it issues, which count up from 1.
+        Assert.Null(manager.Find("1"));
+        Assert.Null(manager.Find("late"));
     }
 }

@@ -5,5 +5,6 @@ public interface IWorkSender
 {
     Task SendDifficultyAsync(StratumSession session, CancellationToken cancellationToken);
 
-    Task SendJobAsync(StratumSession session, bool cleanJobs, CancellationToken cancellationToken);
+    /// <summary>Sends the miner its current job. Jobs are delivered in order; an out-of-date one is dropped.</summary>
+    Task SendJobAsync(StratumSession session, CancellationToken cancellationToken);
 }

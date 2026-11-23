@@ -32,16 +32,20 @@ public sealed partial class JobBroadcaster(
     public void Dispose() => _stopping.Dispose();
 
     private void OnJobsChanged(object? sender, JobsChangedEventArgs args) =>
-        _lastBroadcast = BroadcastAsync(args.IsNewBlock, _stopping.Token);
+        _lastBroadcast = BroadcastAsync(_stopping.Token);
 
-    private Task BroadcastAsync(bool cleanJobs, CancellationToken cancellationToken) =>
-        Task.WhenAll(sessions.Sessions.Select(session => SendSafelyAsync(session, cleanJobs, cancellationToken)));
+    /// <summary>
+    /// Every miner is sent work at once. Broadcasts may overlap when blocks arrive in quick succession;
+    /// each session keeps its own jobs in order, so an older broadcast can never overwrite a newer one.
+    /// </summary>
+    private Task BroadcastAsync(CancellationToken cancellationToken) =>
+        Task.WhenAll(sessions.Sessions.Select(session => SendSafelyAsync(session, cancellationToken)));
 
-    private async Task SendSafelyAsync(StratumSession session, bool cleanJobs, CancellationToken cancellationToken)
+    private async Task SendSafelyAsync(StratumSession session, CancellationToken cancellationToken)
     {
         try
         {
-            await workSender.SendJobAsync(session, cleanJobs, cancellationToken).ConfigureAwait(false);
+            await workSender.SendJobAsync(session, cancellationToken).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // A miner that cannot be reached must not stop the others getting work.
         catch (Exception exception)

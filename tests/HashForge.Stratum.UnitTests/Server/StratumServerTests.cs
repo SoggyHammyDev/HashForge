@@ -217,15 +217,15 @@ public sealed class StratumServerTests
         var healthy = StratumTestKit.Session(extranonce1: [0, 0, 0, 2]);
         sessions.Add(failing);
         sessions.Add(healthy);
-        workSender.SendJobAsync(failing, Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(new IOException("gone")));
+        workSender.SendJobAsync(failing, Arg.Any<CancellationToken>()).Returns(Task.FromException(new IOException("gone")));
         using var broadcaster = new JobBroadcaster(jobSource, sessions, workSender, NullLogger<JobBroadcaster>.Instance);
         await broadcaster.StartAsync(CancellationToken.None);
 
         jobSource.JobsChanged += Raise.EventWith(new JobsChangedEventArgs(isNewBlock: true));
         await broadcaster.StopAsync(CancellationToken.None);
 
-        await workSender.Received(1).SendJobAsync(failing, true, Arg.Any<CancellationToken>());
-        await workSender.Received(1).SendJobAsync(healthy, true, Arg.Any<CancellationToken>());
+        await workSender.Received(1).SendJobAsync(failing, Arg.Any<CancellationToken>());
+        await workSender.Received(1).SendJobAsync(healthy, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -241,7 +241,7 @@ public sealed class StratumServerTests
 
         jobSource.JobsChanged += Raise.EventWith(new JobsChangedEventArgs(isNewBlock: false));
 
-        await workSender.DidNotReceiveWithAnyArgs().SendJobAsync(default!, default, default);
+        await workSender.DidNotReceiveWithAnyArgs().SendJobAsync(default!, default);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition)

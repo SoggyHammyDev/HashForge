@@ -8,13 +8,13 @@ public sealed class WorkSender(IJobSource jobSource, TimeProvider timeProvider) 
     public Task SendDifficultyAsync(StratumSession session, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
-        return session.SendAsync(JobNotification.SetDifficulty(session.VarDiff.Difficulty), cancellationToken);
+        return session.Channel.SendAsync(JobNotification.SetDifficulty(session.VarDiff.Difficulty), cancellationToken);
     }
 
-    public async Task SendJobAsync(StratumSession session, bool cleanJobs, CancellationToken cancellationToken)
+    public async Task SendJobAsync(StratumSession session, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
-        if (session.MinerAddress is not { } address)
+        if (session.Workers.MinerAddress is not { } address)
         {
             return;
         }
@@ -29,7 +29,7 @@ public sealed class WorkSender(IJobSource jobSource, TimeProvider timeProvider) 
         var job = await jobSource.GetCurrentJobAsync(session.Pool, address, cancellationToken).ConfigureAwait(false);
         if (job is not null)
         {
-            await session.SendAsync(JobNotification.Notify(job, cleanJobs), cancellationToken).ConfigureAwait(false);
+            await session.Jobs.SendAsync(job, cancellationToken).ConfigureAwait(false);
         }
     }
 }

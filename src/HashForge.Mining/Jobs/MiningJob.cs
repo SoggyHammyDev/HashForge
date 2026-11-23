@@ -18,7 +18,8 @@ public sealed class MiningJob
         BlockTemplate template,
         CoinbaseTransaction coinbase,
         IReadOnlyList<PayoutEntry> payouts,
-        int? minersPaid = null)
+        int? minersPaid = null,
+        long templateSequence = 0)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(payouts);
@@ -29,6 +30,7 @@ public sealed class MiningJob
         Coinbase = coinbase;
         Payouts = payouts;
         MinersPaid = minersPaid ?? payouts.Count;
+        TemplateSequence = templateSequence;
         Bits = uint.Parse(template.Bits, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         NetworkTarget = DifficultyMath.TargetFromCompact(Bits);
         PreviousBlockHash = HashHex.FromDisplayHex(template.PreviousBlockHash);
@@ -40,6 +42,12 @@ public sealed class MiningJob
     public PoolDefinition Pool { get; }
 
     public BlockTemplate Template { get; }
+
+    /// <summary>
+    /// Which template this job was built from, counting up with each one received from the node.
+    /// A higher number is always newer work.
+    /// </summary>
+    public long TemplateSequence { get; }
 
     public CoinbaseTransaction Coinbase { get; }
 

@@ -16,12 +16,13 @@ public sealed class JobFactory(
     public const int Extranonce1Size = 4;
 
     public async Task<MiningJob> CreateAsync(
-        string jobId,
+        JobIdentity identity,
         PoolDefinition pool,
         BlockTemplate template,
         string minerAddress,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(identity);
         ArgumentNullException.ThrowIfNull(pool);
         ArgumentNullException.ThrowIfNull(template);
 
@@ -43,7 +44,7 @@ public sealed class JobFactory(
 
         // The fee address counts as a miner only when it also mined; otherwise its output is purely the pool fee.
         var minersPaid = payouts.Count(p => p.Address != pool.FeeAddress || plan.Weights.GetValueOrDefault(pool.FeeAddress) > 0);
-        return new MiningJob(jobId, pool, template, coinbase, payouts, minersPaid);
+        return new MiningJob(identity.Id, pool, template, coinbase, payouts, minersPaid, identity.TemplateSequence);
     }
 
     private async Task<byte[]> ResolveScriptAsync(string address, CancellationToken cancellationToken)

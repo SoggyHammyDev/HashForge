@@ -22,7 +22,7 @@ public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender wo
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.GetString(UsernameIndex) is not { } username || session.FindWorker(username) is not { } worker)
+        if (request.GetString(UsernameIndex) is not { } username || session.Workers.Find(username) is not { } worker)
         {
             return StratumReply.Fail(StratumError.Unauthorized);
         }
@@ -41,7 +41,7 @@ public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender wo
             session.VarDiff.PreviousDifficulty);
 
         var result = await shareProcessor.ProcessAsync(submission, cancellationToken).ConfigureAwait(false);
-        session.CountShare(result.IsAccepted);
+        session.Shares.Count(result.IsAccepted);
         if (!result.IsAccepted)
         {
             return StratumReply.Fail(ToError(result.Outcome));
@@ -57,7 +57,7 @@ public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender wo
     private async Task SendNewDifficultyAsync(StratumSession session, CancellationToken cancellationToken)
     {
         await workSender.SendDifficultyAsync(session, cancellationToken).ConfigureAwait(false);
-        await workSender.SendJobAsync(session, cleanJobs: false, cancellationToken).ConfigureAwait(false);
+        await workSender.SendJobAsync(session, cancellationToken).ConfigureAwait(false);
     }
 
     private static StratumError ToError(ShareOutcome outcome) => outcome switch

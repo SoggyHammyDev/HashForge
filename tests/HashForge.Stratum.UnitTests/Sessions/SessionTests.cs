@@ -18,7 +18,7 @@ public sealed class SessionTests
         var session = StratumTestKit.Session(_connection);
 
         Assert.Equal("01020304", session.Id);
-        Assert.Null(session.MinerAddress);
+        Assert.Null(session.Workers.MinerAddress);
         Assert.False(session.IsSubscribed);
         Assert.Equal(0u, session.VersionMask);
         Assert.Equal(_connection.RemoteAddress, session.RemoteAddress);
@@ -29,32 +29,32 @@ public sealed class SessionTests
     {
         var session = StratumTestKit.Session();
 
-        Assert.Equal(AuthorizeOutcome.Authorized, session.Authorize("addr.rig1", new WorkerIdentity("addr", "rig1")));
-        Assert.Equal(AuthorizeOutcome.Authorized, session.Authorize("addr.rig2", new WorkerIdentity("addr", "rig2")));
+        Assert.Equal(AuthorizeOutcome.Authorized, session.Workers.Authorize("addr.rig1", new WorkerIdentity("addr", "rig1")));
+        Assert.Equal(AuthorizeOutcome.Authorized, session.Workers.Authorize("addr.rig2", new WorkerIdentity("addr", "rig2")));
 
-        Assert.Equal("addr", session.MinerAddress);
-        Assert.Equal("rig2", session.FindWorker("addr.rig2")!.WorkerName);
-        Assert.Null(session.FindWorker("unknown"));
+        Assert.Equal("addr", session.Workers.MinerAddress);
+        Assert.Equal("rig2", session.Workers.Find("addr.rig2")!.WorkerName);
+        Assert.Null(session.Workers.Find("unknown"));
     }
 
     [Fact]
     public void GIVEN_TryAuthorize_WHEN_SecondWorkerUsesDifferentAddress_THEN_ItIsRefused()
     {
         var session = StratumTestKit.Session();
-        session.Authorize("addr.rig1", new WorkerIdentity("addr", "rig1"));
+        session.Workers.Authorize("addr.rig1", new WorkerIdentity("addr", "rig1"));
 
-        Assert.Equal(AuthorizeOutcome.DifferentAddress, session.Authorize("other.rig1", new WorkerIdentity("other", "rig1")));
-        Assert.Null(session.FindWorker("other.rig1"));
+        Assert.Equal(AuthorizeOutcome.DifferentAddress, session.Workers.Authorize("other.rig1", new WorkerIdentity("other", "rig1")));
+        Assert.Null(session.Workers.Find("other.rig1"));
     }
 
     [Fact]
     public void GIVEN_ToInfo_WHEN_SharesCounted_THEN_ReflectsSessionState()
     {
         var session = StratumTestKit.AuthorizedSession(_connection);
-        session.Authorize("bc1qmineraddress000.rig0", new WorkerIdentity(StratumTestKit.MinerAddress, "rig0"));
-        session.CountShare(accepted: true);
-        session.CountShare(accepted: true);
-        session.CountShare(accepted: false);
+        session.Workers.Authorize("bc1qmineraddress000.rig0", new WorkerIdentity(StratumTestKit.MinerAddress, "rig0"));
+        session.Shares.Count(accepted: true);
+        session.Shares.Count(accepted: true);
+        session.Shares.Count(accepted: false);
 
         var info = session.ToInfo();
 
@@ -69,7 +69,7 @@ public sealed class SessionTests
     {
         var session = StratumTestKit.Session(_connection);
 
-        await Task.WhenAll(Enumerable.Range(0, 50).Select(i => session.SendAsync($"m{i}", CancellationToken.None)));
+        await Task.WhenAll(Enumerable.Range(0, 50).Select(i => session.Channel.SendAsync($"m{i}", CancellationToken.None)));
 
         Assert.Equal(50, _connection.Sent.Distinct().Count());
     }
@@ -80,7 +80,7 @@ public sealed class SessionTests
         var session = StratumTestKit.Session(_connection);
         _connection.MinerSends("hello");
 
-        Assert.Equal("hello", await session.ReceiveAsync(CancellationToken.None));
+        Assert.Equal("hello", await session.Channel.ReceiveAsync(CancellationToken.None));
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class SessionTests
         var job = HandlerTestData.Job(session.Pool);
         _jobSource.GetCurrentJobAsync(session.Pool, StratumTestKit.MinerAddress, Arg.Any<CancellationToken>()).Returns(job);
 
-        await new WorkSender(_jobSource, _time).SendJobAsync(session, cleanJobs: true, CancellationToken.None);
+        await new WorkSender(_jobSource, _time).SendJobAsync(session, CancellationToken.None);
 
         using var document = JsonDocument.Parse(Assert.Single(_connection.Sent));
         Assert.Equal("mining.notify", document.RootElement.GetProperty("method").GetString());
@@ -152,8 +152,8 @@ public sealed class SessionTests
         var sender = new WorkSender(_jobSource, _time);
         _jobSource.GetCurrentJobAsync(default!, default!, default).ReturnsForAnyArgs((MiningJob?)null);
 
-        await sender.SendJobAsync(StratumTestKit.Session(_connection), cleanJobs: true, CancellationToken.None);
-        await sender.SendJobAsync(StratumTestKit.AuthorizedSession(_connection), cleanJobs: true, CancellationToken.None);
+        await sender.SendJobAsync(StratumTestKit.Session(_connection), CancellationToken.None);
+        await sender.SendJobAsync(StratumTestKit.AuthorizedSession(_connection), CancellationToken.None);
 
         Assert.Empty(_connection.Sent);
     }
@@ -162,14 +162,14 @@ public sealed class SessionTests
     public void GIVEN_Authorize_WHEN_ConnectionAlreadyHasMaximumWorkers_THEN_NewWorkerIsRefusedButKnownOneStillWorks()
     {
         var session = StratumTestKit.Session();
-        for (var i = 0; i < StratumSession.MaxWorkers; i++)
+        for (var i = 0; i < WorkerRoster.MaxWorkers; i++)
         {
-            session.Authorize($"addr.rig{i}", new WorkerIdentity("addr", $"rig{i}"));
+            session.Workers.Authorize($"addr.rig{i}", new WorkerIdentity("addr", $"rig{i}"));
         }
 
-        Assert.Equal(AuthorizeOutcome.TooManyWorkers, session.Authorize("addr.extra", new WorkerIdentity("addr", "extra")));
-        Assert.Equal(AuthorizeOutcome.Authorized, session.Authorize("addr.rig0", new WorkerIdentity("addr", "rig0")));
-        Assert.Equal(StratumSession.MaxWorkers, session.ToInfo().Workers.Count);
+        Assert.Equal(AuthorizeOutcome.TooManyWorkers, session.Workers.Authorize("addr.extra", new WorkerIdentity("addr", "extra")));
+        Assert.Equal(AuthorizeOutcome.Authorized, session.Workers.Authorize("addr.rig0", new WorkerIdentity("addr", "rig0")));
+        Assert.Equal(WorkerRoster.MaxWorkers, session.ToInfo().Workers.Count);
     }
 
     [Fact]
@@ -178,11 +178,9 @@ public sealed class SessionTests
         var stalled = Substitute.For<HashForge.Stratum.Transport.IStratumConnection>();
         stalled.WriteLineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => Task.Delay(Timeout.Infinite, call.Arg<CancellationToken>()));
-        var session = new StratumSession(
-            StratumTestKit.Pool(), stalled, StratumTestKit.Extranonce1,
-            new VarDiffController(StratumTestKit.Options().Value, StratumTestKit.Now), StratumTestKit.Now, TimeSpan.FromMilliseconds(50));
+        var channel = new MinerChannel(stalled, TimeSpan.FromMilliseconds(50));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => session.SendAsync("job", CancellationToken.None));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => channel.SendAsync("job", CancellationToken.None));
     }
 
     [Fact]
@@ -193,7 +191,7 @@ public sealed class SessionTests
             .Returns(HandlerTestData.Job(session.Pool));
         _time.Advance(TimeSpan.FromSeconds(60));
 
-        await new WorkSender(_jobSource, _time).SendJobAsync(session, cleanJobs: false, CancellationToken.None);
+        await new WorkSender(_jobSource, _time).SendJobAsync(session, CancellationToken.None);
 
         Assert.True(session.VarDiff.Difficulty < 1024);
         Assert.Equal(2, _connection.Sent.Count);

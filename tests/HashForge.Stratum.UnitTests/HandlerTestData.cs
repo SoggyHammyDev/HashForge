@@ -7,17 +7,17 @@ namespace HashForge.Stratum.UnitTests;
 
 internal static class HandlerTestData
 {
-    public static MiningJob Job(PoolDefinition pool, string id = "a1")
+    public static MiningJob Job(PoolDefinition pool, string id = "a1", long sequence = 0, string? previousBlockHash = null)
     {
         var template = new BlockTemplate
         {
             Version = 0x20000000,
-            PreviousBlockHash = new string('0', 63) + "1",
+            PreviousBlockHash = previousBlockHash ?? new string('0', 63) + "1",
             Bits = "1d00ffff",
             CoinbaseValue = 312_500_000,
             CurrentTime = 1_700_000_000,
             Height = 850_000,
         };
-        return new MiningJob(id, pool, template, new CoinbaseTransaction([0x01], [0x02], 12, false), []);
+        return new MiningJob(id, pool, template, new CoinbaseTransaction([0x01], [0x02], 12, false), [], templateSequence: sequence);
     }
 }

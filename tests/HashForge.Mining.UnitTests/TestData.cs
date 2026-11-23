@@ -57,7 +57,7 @@ internal static class TestData
         return Microsoft.Extensions.Options.Options.Create(options);
     }
 
-    public static MiningJob Job(PoolDefinition? pool = null, BlockTemplate? template = null, string id = "1")
+    public static MiningJob Job(PoolDefinition? pool = null, BlockTemplate? template = null, string id = "1", long sequence = 0)
     {
         template ??= Template();
         var coinbase = CoinbaseBuilder.Build(new CoinbaseSpec(
@@ -66,7 +66,7 @@ internal static class TestData
             ExtranonceSize: 12,
             [new TransactionOutput(template.CoinbaseValue, [0x51])],
             template.DefaultWitnessCommitment is null ? null : Convert.FromHexString(template.DefaultWitnessCommitment)));
-        return new MiningJob(id, pool ?? Pool(), template, coinbase, [new PayoutEntry(MinerAddress, template.CoinbaseValue)]);
+        return new MiningJob(id, pool ?? Pool(), template, coinbase, [new PayoutEntry(MinerAddress, template.CoinbaseValue)], templateSequence: sequence);
     }
 
     public static ShareResult Share(

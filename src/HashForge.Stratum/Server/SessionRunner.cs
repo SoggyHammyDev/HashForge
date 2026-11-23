@@ -79,7 +79,7 @@ public sealed partial class SessionRunner(
             var message = reply.Error is null
                 ? StratumMessages.Response(request.Id, reply.Result)
                 : StratumMessages.Error(request.Id, reply.Error);
-            await session.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            await session.Channel.SendAsync(message, cancellationToken).ConfigureAwait(false);
 
             if (reply.Disconnect)
             {
@@ -97,7 +97,7 @@ public sealed partial class SessionRunner(
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_idleTimeout);
-        return await session.ReceiveAsync(timeout.Token).ConfigureAwait(false);
+        return await session.Channel.ReceiveAsync(timeout.Token).ConfigureAwait(false);
     }
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Miner {RemoteAddress} connected to pool {Pool}")]

@@ -45,7 +45,7 @@ public sealed partial class AuthorizeHandler(
             return Reject(session, username, $"the node rejected the address: {address.Error}");
         }
 
-        var outcome = session.Authorize(username!, worker);
+        var outcome = session.Workers.Authorize(username!, worker);
         if (outcome != AuthorizeOutcome.Authorized)
         {
             return Reject(session, username, outcome == AuthorizeOutcome.TooManyWorkers ? TooManyWorkersReason : DifferentAddressReason);
@@ -55,7 +55,7 @@ public sealed partial class AuthorizeHandler(
         return StratumReply.Ok(followUp: async ct =>
         {
             await workSender.SendDifficultyAsync(session, ct).ConfigureAwait(false);
-            await workSender.SendJobAsync(session, cleanJobs: true, ct).ConfigureAwait(false);
+            await workSender.SendJobAsync(session, ct).ConfigureAwait(false);
         });
     }
 

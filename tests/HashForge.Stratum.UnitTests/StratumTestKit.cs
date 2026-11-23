@@ -68,14 +68,19 @@ internal static class StratumTestKit
         new() { Name = name, Scheme = scheme, Port = port, FeeAddress = "fee" };
 
     public static StratumSession Session(FakeConnection? connection = null, PoolDefinition? pool = null, byte[]? extranonce1 = null) =>
-        new(pool ?? Pool(), connection ?? new FakeConnection(), extranonce1 ?? Extranonce1, new VarDiffController(Options().Value, Now), Now, TimeSpan.FromSeconds(30));
+        new(
+            pool ?? Pool(),
+            new MinerChannel(connection ?? new FakeConnection(), TimeSpan.FromSeconds(30)),
+            extranonce1 ?? Extranonce1,
+            new VarDiffController(Options().Value, Now),
+            Now);
 
     /// <summary>A session that has subscribed and authorised "bc1qmineraddress000.rig1".</summary>
     public static StratumSession AuthorizedSession(FakeConnection? connection = null, PoolDefinition? pool = null)
     {
         var session = Session(connection, pool);
         session.IsSubscribed = true;
-        session.Authorize($"{MinerAddress}.rig1", new WorkerIdentity(MinerAddress, "rig1"));
+        session.Workers.Authorize($"{MinerAddress}.rig1", new WorkerIdentity(MinerAddress, "rig1"));
         return session;
     }
 

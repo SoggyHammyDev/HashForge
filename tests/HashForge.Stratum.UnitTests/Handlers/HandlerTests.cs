@@ -151,15 +151,15 @@ public sealed class HandlerTests
 
         Assert.Equal(true, reply.Result);
         Assert.False(reply.Disconnect);
-        Assert.Equal(new WorkerIdentity(StratumTestKit.MinerAddress, "rig1"), session.FindWorker("bc1qmineraddress000.rig1"));
-        await _workSender.DidNotReceiveWithAnyArgs().SendJobAsync(default!, default, default);
+        Assert.Equal(new WorkerIdentity(StratumTestKit.MinerAddress, "rig1"), session.Workers.Find("bc1qmineraddress000.rig1"));
+        await _workSender.DidNotReceiveWithAnyArgs().SendJobAsync(default!, default);
 
         await reply.FollowUp!(CancellationToken.None);
 
         Received.InOrder(() =>
         {
             _workSender.SendDifficultyAsync(session, Arg.Any<CancellationToken>());
-            _workSender.SendJobAsync(session, true, Arg.Any<CancellationToken>());
+            _workSender.SendJobAsync(session, Arg.Any<CancellationToken>());
         });
     }
 
@@ -174,7 +174,7 @@ public sealed class HandlerTests
         Assert.True(reply.Disconnect);
         Assert.Equal(24, reply.Error!.Code);
         Assert.Contains("Invalid checksum", reply.Error.Message);
-        Assert.Null(session.MinerAddress);
+        Assert.Null(session.Workers.MinerAddress);
         var logged = Assert.Single(_authorizeLogger.ReceivedCalls(), c => c.GetMethodInfo().Name == nameof(ILogger.Log));
         Assert.Equal(LogLevel.Warning, logged.GetArguments()[0]);
         var message = logged.GetArguments()[2]!.ToString();
@@ -300,7 +300,7 @@ public sealed class HandlerTests
         Received.InOrder(() =>
         {
             _workSender.SendDifficultyAsync(session, Arg.Any<CancellationToken>());
-            _workSender.SendJobAsync(session, false, Arg.Any<CancellationToken>());
+            _workSender.SendJobAsync(session, Arg.Any<CancellationToken>());
         });
     }
 
