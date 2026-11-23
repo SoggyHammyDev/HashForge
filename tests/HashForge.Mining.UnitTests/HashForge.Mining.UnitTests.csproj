@@ -1,0 +1,5 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\HashForge.Mining\HashForge.Mining.csproj" />
+  </ItemGroup>
+</Project>

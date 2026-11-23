@@ -1,0 +1,60 @@
+@page "/connect"
+@inject IPoolRegistry Pools
+@inject IOptions<WebOptions> Options
+
+<BrandTitle Page="Connect" />
+
+<div class="page-head">
+    <h1>Connect a miner</h1>
+    <p>Any SHA-256 miner that speaks Stratum can join. There is no account to create.</p>
+</div>
+
+<SectionCard Icon="IconKind.Connections" Title="How to connect">
+    <ol class="steps">
+        <li>Choose a pool below and enter its <strong>Stratum address</strong> as the pool URL on your miner.</li>
+        <li>Set the <strong>username to your Bitcoin address</strong>, optionally followed by a dot and a name for the machine, for example <code>bc1q…xyz.garage</code>.</li>
+        <li>The <strong>password is ignored</strong>; enter anything.</li>
+    </ol>
+</SectionCard>
+
+<SectionCard Icon="IconKind.Port" Title="Pools" Flush="true"
+             Footnote="Rewards are paid straight to your address inside the block itself, so the address is verified when you connect and an invalid one is refused.">
+    @if (Pools.Pools.Count == 0)
+    {
+        <p class="empty">No pools are running.</p>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr><th>Pool</th><th>Payout</th><th>Stratum address</th><th class="num">Fee</th><th>How rewards are split</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var pool in Pools.Pools)
+                    {
+                        <tr>
+                            <td><a href="pool/@pool.Name">@pool.Name</a></td>
+                            <td><SchemeBadge Scheme="pool.Scheme" /></td>
+                            <td><code>stratum+tcp://@Options.Value.StratumHost:@pool.Port</code></td>
+                            <td class="num">@Display.Percent((double)pool.FeePercent)</td>
+                            <td>@Describe(pool)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</SectionCard>
+
+@code {
+    private static string Describe(PoolDefinition pool) => pool.Scheme switch
+    {
+        PayoutScheme.Solo => "Whoever finds the block keeps the whole reward.",
+        PayoutScheme.Prop => "Split by the work each miner did since the pool's last block.",
+        PayoutScheme.Pplns => $"Split by each miner's share of the most recent work ({pool.PplnsWindowMultiplier}× network difficulty).",
+        PayoutScheme.FinderBonus =>
+            $"Whoever finds the block gets {Display.Bitcoin(pool.FinderBonusSatoshis)} first; the rest is split by the work each miner did since the pool's last block.",
+        _ => string.Empty,
+    };
+}

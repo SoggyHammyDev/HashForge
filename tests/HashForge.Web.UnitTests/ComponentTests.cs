@@ -1,0 +1,641 @@
+using System.Net;
+using Bunit;
+using HashForge.Domain;
+using HashForge.Mining.History;
+using HashForge.Mining.Pools;
+using HashForge.Mining.Statistics;
+using HashForge.Stratum.Sessions;
+using HashForge.Web.Components.Layout;
+using HashForge.Web.Components.Pages;
+using HashForge.Web.Components.Shared;
+using HashForge.Web.Services;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using AdminPage = HashForge.Web.Components.Pages.Admin;
+
+namespace HashForge.Web.UnitTests;
+
+public sealed class ComponentTests : WebTestContext
+{
+    private static PoolHistorySample Sample(int minutes, double hashrate) => new("pplns", Now.AddMinutes(minutes), hashrate, 3, 4);
+
+    private IRenderedComponent<NavMenu> RenderNav(bool adminAllowed)
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("192.168.1.20");
+        AdminAccess.IsAllowed(context.Connection.RemoteIpAddress).Returns(adminAllowed);
+        return Render<NavMenu>(p => p.AddCascadingValue<HttpContext>(context));
+    }
+
+    [Fact]
+    public void GIVEN_NavMenu_WHEN_VisitorIsOnAllowedNetwork_THEN_AdminLinkIsShown()
+    {
+        Assert.Contains(RenderNav(adminAllowed: true).FindAll("a"), a => a.TextContent == "Admin");
+    }
+
+    [Fact]
+    public void GIVEN_NavMenu_WHEN_VisitorIsOutsideAllowedNetworks_THEN_AdminLinkIsHidden()
+    {
+        var links = RenderNav(adminAllowed: false).FindAll("a").Select(a => a.TextContent);
+
+        Assert.Equal(["Pools", "Blocks", "Connect"], links);
+    }
+
+    [Fact]
+    public void GIVEN_StatTile_WHEN_HintIsOmitted_THEN_OnlyLabelAndValueRender()
+    {
+        var tile = Render<StatTile>(p => p.Add(t => t.Label, "Hashrate").Add(t => t.Value, "2.5 TH/s"));
+
+        Assert.Equal("Hashrate", tile.Find(".tile-label").TextContent);
+        Assert.Equal("2.5 TH/s", tile.Find(".tile-value").TextContent);
+        Assert.Empty(tile.FindAll(".tile-hint"));
+    }
+
+    [Fact]
+    public void GIVEN_StatsTiles_WHEN_Rendered_THEN_ShowsEffortSharesAndBestShareWorker()
+    {
+        var tiles = Render<StatsTiles>(p => p.Add(t => t.Stats, Stats()).Add(t => t.Now, Now));
+
+        var text = tiles.Markup;
+        Assert.Contains("2.5 TH/s", text);
+        Assert.Contains("42.5%", text);
+        Assert.Contains("120", text);
+        Assert.Contains("8.1 G", text);
+        Assert.Contains("bc1qalice.rig1", text);
+        Assert.Contains("30s ago", text);
+    }
+
+    [Fact]
+    public void GIVEN_BlockTable_WHEN_NoBlocks_THEN_ShowsEmptyMessage()
+    {
+        var table = Render<BlockTable>(p => p.Add(t => t.Blocks, []).Add(t => t.Now, Now));
+
+        Assert.Contains("No blocks found yet", table.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_BlockTable_WHEN_BlocksGiven_THEN_ShowsRewardEffortAndStatus()
+    {
+        var table = Render<BlockTable>(p => p.Add(t => t.Blocks, [Block(), Block(accepted: false)]).Add(t => t.Now, Now));
+
+        var rows = table.FindAll("tbody tr");
+        Assert.Equal(2, rows.Count);
+        Assert.Contains("850001", rows[0].TextContent);
+        Assert.Contains("3.12500000 BTC", rows[0].TextContent);
+        Assert.Contains("87.5%", rows[0].TextContent);
+        Assert.Contains("Miners paid", table.Find("thead").TextContent);
+        Assert.Equal("34", rows[0].QuerySelectorAll("td")[5].TextContent);
+        Assert.Contains("Accepted", rows[0].TextContent);
+        Assert.Contains("Rejected: high-hash", rows[1].TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_HashrateChart_WHEN_FewerThanTwoSamples_THEN_ShowsPlaceholderInsteadOfChart()
+    {
+        var chart = Render<HashrateChart>(p => p.Add(c => c.Samples, [Sample(0, 1e12)]));
+
+        Assert.Empty(chart.FindAll("svg[role=img]"));
+        Assert.Contains("appears once", chart.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_HashrateChart_WHEN_SamplesGiven_THEN_DrawsLineWithHoverPointsAxisAndTableView()
+    {
+        var chart = Render<HashrateChart>(p => p.Add(c => c.Samples, [Sample(0, 1e12), Sample(5, 2e12), Sample(10, 2.4e12)]));
+
+        Assert.Equal(3, chart.Find("polyline.chart-line").GetAttribute("points")!.Split(' ').Length);
+        Assert.Equal(3, chart.FindAll("circle.chart-hit").Count);
+        Assert.Contains("2.4 TH/s, 3 miners", chart.Find("circle.chart-hit:last-of-type title").TextContent);
+        Assert.Contains("5 TH/s", chart.Markup);
+        Assert.Equal(3, chart.FindAll("details tbody tr").Count);
+    }
+
+    [Fact]
+    public void GIVEN_Home_WHEN_PoolsAndNetworkAvailable_THEN_ShowsPoolsTotalsAndNetworkStats()
+    {
+        Overview.GetPools().Returns([PoolSnapshot("solo", PayoutScheme.Solo, 3333), PoolSnapshot()]);
+        Overview.GetTotals().Returns(new ShareTotals(5000, 25));
+        Overview.GetBestShare().Returns(new BestShare(7.7e12, "bc1qbob.s21", Now));
+        NetworkStats.Current.Returns(Network());
+        Blocks.GetRecentAsync(5, Arg.Any<CancellationToken>()).Returns([Block()]);
+
+        var home = Render<Home>();
+
+        Assert.Equal(2, home.FindAll("table")[0].QuerySelectorAll("tbody tr").Length);
+        Assert.Contains("SOLO", home.Markup);
+        Assert.Contains("5,000", home.Markup);
+        Assert.Contains("7.7 T", home.Markup);
+        Assert.Contains("bc1qbob.s21", home.Markup);
+        Assert.Contains("850,000", home.Markup);
+        Assert.Contains("650 EH/s", home.Markup);
+        Assert.Contains("850001", home.Markup);
+        Assert.Empty(home.FindAll(".notice"));
+    }
+
+    [Fact]
+    public void GIVEN_Home_WHEN_NodeIsUnreachableAndNoPools_THEN_ShowsWaitingMessages()
+    {
+        NetworkStats.Current.Returns((HashForge.Mining.Network.NetworkStats?)null);
+
+        var home = Render<Home>();
+
+        Assert.Contains("No pools are running", home.Markup);
+        Assert.Contains("Waiting for the Bitcoin node", home.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_Home_WHEN_NodeIsSynchronising_THEN_ShowsSyncNotice()
+    {
+        NetworkStats.Current.Returns(Network(synced: false));
+
+        Assert.Contains("still synchronising (50%)", Render<Home>().Find(".notice").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_RefreshingComponent_WHEN_RefreshIntervalElapses_THEN_PageReloadsItsData()
+    {
+        var home = Render<Home>();
+        Overview.GetPools().Returns([PoolSnapshot("late-pool")]);
+
+        Time.Advance(TimeSpan.FromSeconds(WebOptions.RefreshSeconds));
+
+        home.WaitForAssertion(() => Assert.Contains("late-pool", home.Markup));
+    }
+
+    [Fact]
+    public void GIVEN_RefreshingComponent_WHEN_Disposed_THEN_NoFurtherReloadsHappen()
+    {
+        var home = Render<Home>();
+        home.Instance.Dispose();
+        Overview.ClearReceivedCalls();
+
+        Time.Advance(TimeSpan.FromSeconds(60));
+
+        Overview.DidNotReceive().GetPools();
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_PoolExists_THEN_ShowsStatsChartAndMiners()
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+        Statistics.GetMiners("pplns").Returns([new MinerSnapshot("bc1qalicealicealicealicealice", Stats(), [new WorkerSnapshot("rig1", Stats())])]);
+        History.GetSinceAsync("pplns", Now.AddHours(-24), Arg.Any<CancellationToken>()).Returns([Sample(-10, 1e12), Sample(-5, 2e12)]);
+
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+
+        Assert.Contains("PPLNS", pool.Find("h1").TextContent);
+        Assert.Contains("3334", pool.Markup);
+        Assert.Contains("9 workers", pool.Markup);
+        Assert.Single(pool.FindAll("svg[role=img]"));
+        Assert.Equal("pool/pplns/miner/bc1qalicealicealicealicealice", pool.Find("tbody a").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_PoolDoesNotExist_THEN_ShowsNotFoundMessage()
+    {
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "ghost"));
+
+        Assert.Contains("Pool not found", pool.Markup);
+        Statistics.DidNotReceiveWithAnyArgs().GetMiners(default!);
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_AddressIsSearched_THEN_NavigatesToThatMiner()
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+
+        pool.Find("#miner-address").Change(" bc1qsearchsearchsearch ");
+        pool.Find("form").Submit();
+
+        Assert.EndsWith("/pool/pplns/miner/bc1qsearchsearchsearch", Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_SearchIsEmpty_THEN_StaysOnPage()
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+        var before = Services.GetRequiredService<NavigationManager>().Uri;
+
+        pool.Find("form").Submit();
+
+        Assert.Equal(before, Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [Fact]
+    public void GIVEN_Miner_WHEN_MinerHasWorkers_THEN_ShowsStatsPerWorker()
+    {
+        Statistics.GetMiner("pplns", "bc1qalicealicealice").Returns(
+            new MinerSnapshot("bc1qalicealicealice", Stats(), [new WorkerSnapshot("garage", Stats(accepted: 77)), new WorkerSnapshot("shed", Stats())]));
+
+        var miner = Render<Miner>(p => p.Add(x => x.PoolName, "pplns").Add(x => x.Address, "bc1qalicealicealice"));
+
+        var rows = miner.FindAll("tbody tr");
+        Assert.Equal(2, rows.Count);
+        Assert.Contains("garage", rows[0].TextContent);
+        Assert.Contains("77", rows[0].TextContent);
+        Assert.Equal("bc1qalicealicealice", miner.Find("h1").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_Miner_WHEN_AddressHasNoShares_THEN_ShowsEmptyMessage()
+    {
+        var miner = Render<Miner>(p => p.Add(x => x.PoolName, "pplns").Add(x => x.Address, "bc1qnobodynobodynobody"));
+
+        Assert.Contains("has not submitted any shares", miner.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_BlocksPage_WHEN_Rendered_THEN_RequestsConfiguredNumberOfBlocks()
+    {
+        WebOptions.RecentBlockCount = 40;
+        Blocks.GetRecentAsync(40, Arg.Any<CancellationToken>()).Returns([Block()]);
+
+        var page = Render<Blocks>();
+
+        Assert.Single(page.FindAll("tbody tr"));
+    }
+
+    [Fact]
+    public void GIVEN_Connect_WHEN_PoolsAreRunning_THEN_ShowsStratumAddressFeeAndPayoutRulePerPool()
+    {
+        Registry.Pools.Returns(
+        [
+            PoolDefinition("solo", PayoutScheme.Solo, 3333),
+            PoolDefinition("prop", PayoutScheme.Prop, 3335),
+            PoolDefinition(),
+            PoolDefinition("bonus", PayoutScheme.FinderBonus, 3336),
+        ]);
+
+        var page = Render<Connect>();
+
+        var rows = page.FindAll("tbody tr");
+        Assert.Contains("stratum+tcp://pool.example:3333", rows[0].TextContent);
+        Assert.Contains("keeps the whole reward", rows[0].TextContent);
+        Assert.Contains("since the pool's last block", rows[1].TextContent);
+        Assert.Contains("1.5%", rows[2].TextContent);
+        Assert.Contains("2× network difficulty", rows[2].TextContent);
+        Assert.Contains("BONUS", rows[3].TextContent);
+        Assert.Contains("gets 1.00000000 BTC first", rows[3].TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_Connect_WHEN_NoPools_THEN_ShowsEmptyMessage()
+    {
+        Assert.Contains("No pools are running", Render<Connect>().Markup);
+    }
+
+    [Fact]
+    public void GIVEN_Admin_WHEN_NodeIsSynchronising_THEN_ShowsSyncStatusAndPruning()
+    {
+        NetworkStats.Current.Returns(Network(synced: false));
+
+        var admin = Render<AdminPage>();
+
+        Assert.Contains("Synchronising", admin.Markup);
+        Assert.Contains("50%", admin.Markup);
+        Assert.Contains("of 900,000 headers", admin.Markup);
+        Assert.Contains("pruned node", admin.Markup);
+        Assert.Contains("12 GB", admin.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_Admin_WHEN_NodeHasNotAnswered_THEN_ShowsNotice()
+    {
+        NetworkStats.Current.Returns((HashForge.Mining.Network.NetworkStats?)null);
+
+        Assert.Contains("has not answered yet", Render<AdminPage>().Find(".notice").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_Admin_WHEN_MinersAreConnected_THEN_ShowsTotalsSessionsAndIpList()
+    {
+        NetworkStats.Current.Returns(Network());
+        Overview.GetPools().Returns([PoolSnapshot("solo", PayoutScheme.Solo, 3333)]);
+        Overview.GetTotals().Returns(new ShareTotals(9000, 12));
+        Miners.GetSessions().Returns(
+        [
+            new SessionInfo("01", "solo", IPAddress.Parse("192.168.1.40"), "bc1qalicealicealicealice", ["rig1", "rig2"], 4096, 500, 2, Now.AddMinutes(-7)),
+            new SessionInfo("02", "solo", IPAddress.Parse("192.168.1.41"), null, [], 1024, 0, 0, Now),
+        ]);
+        Miners.GetAddresses().Returns([new ConnectedAddress(IPAddress.Parse("192.168.1.40"), 1), new ConnectedAddress(IPAddress.Parse("192.168.1.41"), 1)]);
+
+        var admin = Render<AdminPage>();
+
+        Assert.Contains("Synced", admin.Markup);
+        Assert.Contains("9,000", admin.Markup);
+        Assert.Contains("2 IP addresses", admin.Markup);
+        var sessionRows = admin.FindAll("table")[1].QuerySelectorAll("tbody tr");
+        Assert.Contains("192.168.1.40", sessionRows[0].TextContent);
+        Assert.Contains("rig1, rig2", sessionRows[0].TextContent);
+        Assert.Contains("4.1 K", sessionRows[0].TextContent);
+        Assert.Contains("7m ago", sessionRows[0].TextContent);
+        Assert.Contains("not authorised", sessionRows[1].TextContent);
+        Assert.Equal(2, admin.FindAll(".ip-list li").Count);
+    }
+
+    [Fact]
+    public void GIVEN_Admin_WHEN_PoolFormSubmitted_THEN_PoolIsStartedWithoutRestartAndConfirmed()
+    {
+        PoolDefinition? requested = null;
+        Provisioner.AddAsync(Arg.Do<PoolDefinition>(p => requested = p), Arg.Any<CancellationToken>()).Returns(ProvisionResult.Success);
+        var admin = Render<AdminPage>();
+
+        admin.Find("input[placeholder='pplns-2']").Change(" prop-2 ");
+        admin.Find("select").Change("Prop");
+        admin.FindAll("input[type=number]")[0].Change("3340");
+        admin.FindAll("input[type=number]")[1].Change("2.5");
+        admin.Find("input[placeholder='bc1q…']").Change("tb1qfee");
+        admin.Find("form").Submit();
+
+        Assert.Equal(("prop-2", PayoutScheme.Prop, 3340, 2.5m, "tb1qfee"), (requested!.Name, requested.Scheme, requested.Port, requested.FeePercent, requested.FeeAddress));
+        Assert.Contains("now listening on port 3340", admin.Find(".success").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_Admin_WHEN_PoolCannotBeStarted_THEN_ReasonIsShown()
+    {
+        Provisioner.AddAsync(Arg.Any<PoolDefinition>(), Arg.Any<CancellationToken>())
+            .Returns(ProvisionResult.Failure("Port 3334 is already used by pool 'pplns'."));
+        var admin = Render<AdminPage>();
+
+        admin.Find("form").Submit();
+
+        Assert.Contains("already used", admin.Find("p.notice[role=status]").TextContent);
+    }
+
+    [Theory]
+    [InlineData(true, "was stopped")]
+    [InlineData(false, "was not running")]
+    public void GIVEN_Admin_WHEN_StopIsClicked_THEN_PoolIsRemovedAndOutcomeShown(bool removed, string expectedMessage)
+    {
+        Overview.GetPools().Returns([PoolSnapshot("solo", PayoutScheme.Solo, 3333)]);
+        Provisioner.RemoveAsync("solo", Arg.Any<CancellationToken>()).Returns(removed);
+        var admin = Render<AdminPage>();
+
+        admin.Find("button.danger").Click();
+
+        Provisioner.Received(1).RemoveAsync("solo", Arg.Any<CancellationToken>());
+        Assert.Contains(expectedMessage, admin.Find("[role=status]").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_StaticPages_WHEN_Rendered_THEN_ShowTheirHeadings()
+    {
+        Assert.Contains("Page not found", Render<NotFound>().Markup);
+        Assert.Contains("Something went wrong", Render<Error>().Markup);
+    }
+
+    [Fact]
+    public void GIVEN_MainLayout_WHEN_Rendered_THEN_ShowsBrandNavigationAndBody()
+    {
+        var layout = Render<MainLayout>(p => p.Add(l => l.Body, builder => builder.AddContent(0, "page body")));
+
+        Assert.Equal("HashForge", layout.Find(".brand-name").TextContent);
+        Assert.NotEmpty(layout.FindAll(".header-status .pill"));
+        Assert.Equal("H", layout.Find("span.brand-mark").TextContent);
+        Assert.Contains("Open-source Bitcoin mining pool", layout.Find("footer").TextContent);
+        Assert.Contains("page body", layout.Find("main").TextContent);
+        Assert.NotEmpty(layout.FindAll("nav a"));
+    }
+
+    [Theory]
+    [InlineData(StatusKind.Good, "pill-good")]
+    [InlineData(StatusKind.Bad, "pill-bad")]
+    [InlineData(StatusKind.Busy, "pill-busy")]
+    [InlineData(StatusKind.Neutral, "pill-neutral")]
+    public void GIVEN_StatusPill_WHEN_KindGiven_THEN_ShowsTextWithMatchingStyle(StatusKind kind, string expectedClass)
+    {
+        var pill = Render<StatusPill>(p => p.Add(x => x.Kind, kind).Add(x => x.Text, "Accepted")).Find(".pill");
+
+        Assert.Equal("Accepted", pill.TextContent);
+        Assert.Contains(expectedClass, pill.ClassList);
+    }
+
+    [Theory]
+    [InlineData(PayoutScheme.Solo, "SOLO")]
+    [InlineData(PayoutScheme.Prop, "PROP")]
+    [InlineData(PayoutScheme.Pplns, "PPLNS")]
+    [InlineData(PayoutScheme.FinderBonus, "BONUS")]
+    public void GIVEN_SchemeBadge_WHEN_SchemeGiven_THEN_ShowsUppercaseName(PayoutScheme scheme, string expected)
+    {
+        Assert.Equal(expected, Render<SchemeBadge>(p => p.Add(x => x.Scheme, scheme)).Find(".badge").TextContent);
+    }
+
+    [Theory]
+    [InlineData(42.5, "42.5%", "width: 42.5%")]
+    [InlineData(250, "250%", "width: 100%")]
+    [InlineData(0, "0%", "width: 0%")]
+    public void GIVEN_EffortMeter_WHEN_PercentGiven_THEN_ShowsValueAndBarCappedAtFull(double percent, string expectedText, string expectedStyle)
+    {
+        var meter = Render<EffortMeter>(p => p.Add(x => x.Percent, percent));
+
+        Assert.Equal(expectedText, meter.Find(".effort > span").TextContent);
+        Assert.Equal(expectedStyle, meter.Find(".meter > span").GetAttribute("style"));
+    }
+
+    [Fact]
+    public void GIVEN_SectionCard_WHEN_AllPartsGiven_THEN_ShowsTitleAsideBodyAndFootnote()
+    {
+        var card = Render<SectionCard>(p => p
+            .Add(x => x.Title, "Pools")
+            .Add(x => x.Aside, "3 running")
+            .Add(x => x.Footnote, "A note")
+            .Add(x => x.Flush, true)
+            .AddChildContent("body text"));
+
+        Assert.Equal("Pools", card.Find("h2").TextContent);
+        Assert.Equal("3 running", card.Find(".card-aside").TextContent);
+        Assert.Equal("A note", card.Find(".card-foot").TextContent);
+        Assert.Contains("body text", card.Find(".card-body.flush").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_SectionCard_WHEN_OnlyTitleGiven_THEN_OptionalPartsAreOmitted()
+    {
+        var card = Render<SectionCard>(p => p.Add(x => x.Title, "Pools"));
+
+        Assert.Empty(card.FindAll(".card-aside"));
+        Assert.Empty(card.FindAll(".card-foot"));
+        Assert.Empty(card.FindAll(".flush"));
+    }
+
+    [Fact]
+    public void GIVEN_NodeStatus_WHEN_NodeIsSynced_THEN_ShowsChainAndHeight()
+    {
+        NetworkStats.Current.Returns(Network());
+
+        var pill = Render<NodeStatus>().Find(".pill");
+
+        Assert.Equal("main · block 850,000", pill.TextContent);
+        Assert.Contains("pill-good", pill.ClassList);
+    }
+
+    [Fact]
+    public void GIVEN_NodeStatus_WHEN_NodeIsSynchronising_THEN_ShowsProgress()
+    {
+        NetworkStats.Current.Returns(Network(synced: false));
+
+        var pill = Render<NodeStatus>().Find(".pill");
+
+        Assert.Equal("main · syncing 50%", pill.TextContent);
+        Assert.Contains("pill-busy", pill.ClassList);
+    }
+
+    [Fact]
+    public void GIVEN_NodeStatus_WHEN_NodeHasNotAnswered_THEN_ShowsConnecting()
+    {
+        NetworkStats.Current.Returns((HashForge.Mining.Network.NetworkStats?)null);
+
+        Assert.Contains("Connecting to node", Render<NodeStatus>().Find(".pill-neutral").TextContent);
+    }
+
+    [Theory]
+    [InlineData("Solo")]
+    [InlineData("Prop")]
+    [InlineData("Pplns")]
+    public void GIVEN_Admin_WHEN_PayoutIsNotBonus_THEN_FinderBonusFieldIsHidden(string scheme)
+    {
+        var admin = Render<AdminPage>();
+
+        admin.Find("select").Change(scheme);
+
+        Assert.Empty(admin.FindAll("#finder-bonus"));
+    }
+
+    [Fact]
+    public void GIVEN_Admin_WHEN_PayoutIsBonus_THEN_FinderBonusFieldAppearsAndItsAmountIsUsed()
+    {
+        PoolDefinition? requested = null;
+        Provisioner.AddAsync(Arg.Do<PoolDefinition>(p => requested = p), Arg.Any<CancellationToken>()).Returns(ProvisionResult.Success);
+        var admin = Render<AdminPage>();
+
+        admin.Find("select").Change("FinderBonus");
+        Assert.Equal("1", admin.Find("#finder-bonus").GetAttribute("value"));
+        admin.Find("#finder-bonus").Change("0.25");
+        admin.Find("form").Submit();
+
+        Assert.Equal(PayoutScheme.FinderBonus, requested!.Scheme);
+        Assert.Equal(25_000_000, requested.FinderBonusSatoshis);
+    }
+
+    [Fact]
+    public void GIVEN_Admin_WHEN_BonusAmountEnteredThenPayoutChangedAway_THEN_AmountIsNotApplied()
+    {
+        PoolDefinition? requested = null;
+        Provisioner.AddAsync(Arg.Do<PoolDefinition>(p => requested = p), Arg.Any<CancellationToken>()).Returns(ProvisionResult.Success);
+        var admin = Render<AdminPage>();
+
+        admin.Find("select").Change("FinderBonus");
+        admin.Find("#finder-bonus").Change("5");
+        admin.Find("select").Change("Prop");
+        admin.Find("form").Submit();
+
+        Assert.Equal(HashForge.Domain.PoolDefinition.DefaultFinderBonusSatoshis, requested!.FinderBonusSatoshis);
+    }
+
+    [Theory]
+    [InlineData("<script>alert(1)</script>")]
+    [InlineData("bc1q'; DROP TABLE blocks;--")]
+    [InlineData("../../admin")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("tooshort")]
+    public void GIVEN_Pool_WHEN_SearchTextIsNotAnAddress_THEN_ShowsErrorAndDoesNotNavigate(string input)
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+        var before = Services.GetRequiredService<NavigationManager>().Uri;
+
+        pool.Find("#miner-address").Change(input);
+        pool.Find("form").Submit();
+
+        Assert.Equal(before, Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.Contains("does not look like a Bitcoin address", pool.Find("[role=alert]").TextContent);
+        Assert.Empty(pool.FindAll("script"));
+        Assert.DoesNotContain(input, pool.Find("[role=alert]").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_ValidSearchFollowsInvalidOne_THEN_ErrorIsCleared()
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+        pool.Find("#miner-address").Change("not an address");
+        pool.Find("form").Submit();
+
+        pool.Find("#miner-address").Change("bc1qsearchsearchsearch");
+        pool.Find("form").Submit();
+
+        Assert.Empty(pool.FindAll("[role=alert]"));
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_Rendered_THEN_SearchBoxLimitsInputLength()
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+
+        var input = Render<Pool>(p => p.Add(x => x.Name, "pplns")).Find("#miner-address");
+
+        Assert.Equal("90", input.GetAttribute("maxlength"));
+    }
+
+    [Theory]
+    [InlineData("<img src=x onerror=alert(1)>")]
+    [InlineData("bc1q\" onmouseover=\"alert(1)")]
+    [InlineData("short")]
+    public void GIVEN_Miner_WHEN_AddressInUrlIsNotAddressShaped_THEN_ItIsNeitherLookedUpNorDisplayed(string address)
+    {
+        var miner = Render<Miner>(p => p.Add(x => x.PoolName, "pplns").Add(x => x.Address, address));
+
+        Assert.Contains("not valid", miner.Markup);
+        Assert.Equal("Miner", miner.Find("h1").TextContent);
+        Assert.DoesNotContain("onerror", miner.Markup);
+        Assert.DoesNotContain("onmouseover", miner.Markup);
+        Statistics.DidNotReceiveWithAnyArgs().GetMiner(default!, default!);
+    }
+
+    [Fact]
+    public void GIVEN_Miner_WHEN_PoolNameInUrlContainsMarkup_THEN_ItIsEncodedInLinkAndText()
+    {
+        var miner = Render<Miner>(p => p.Add(x => x.PoolName, "a\"><script>x</script>").Add(x => x.Address, "bc1qalicealicealice"));
+
+        Assert.Empty(miner.FindAll("script"));
+        Assert.StartsWith("pool/a%22%3E%3Cscript", miner.Find("a.back-link").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void GIVEN_Icon_WHEN_KindIsNone_THEN_NothingIsRendered()
+    {
+        Assert.Empty(Render<Icon>(p => p.Add(i => i.Kind, IconKind.None)).FindAll("svg"));
+    }
+
+    [Fact]
+    public void GIVEN_Icon_WHEN_KindGiven_THEN_RendersDecorativeSvgHiddenFromScreenReaders()
+    {
+        var svg = Render<Icon>(p => p.Add(i => i.Kind, IconKind.Hashrate)).Find("svg.icon");
+
+        Assert.Equal("true", svg.GetAttribute("aria-hidden"));
+        Assert.NotEmpty(svg.Children);
+    }
+
+    [Fact]
+    public void GIVEN_IconShapes_WHEN_EveryKindIsRequested_THEN_EachHasADrawingExceptNone()
+    {
+        Assert.Equal(string.Empty, IconShapes.For(IconKind.None));
+        Assert.All(Enum.GetValues<IconKind>().Where(k => k != IconKind.None), k => Assert.StartsWith("<", IconShapes.For(k)));
+    }
+
+    [Fact]
+    public void GIVEN_StatTileAndSectionCard_WHEN_IconGiven_THEN_IconSitsBesideTheLabel()
+    {
+        var tile = Render<StatTile>(p => p.Add(t => t.Label, "Hashrate").Add(t => t.Value, "1 TH/s").Add(t => t.Icon, IconKind.Hashrate));
+        var card = Render<SectionCard>(p => p.Add(c => c.Title, "Pools").Add(c => c.Icon, IconKind.Port));
+
+        Assert.Single(tile.FindAll(".tile-label svg.icon"));
+        Assert.Equal("Hashrate", tile.Find(".tile-label").TextContent);
+        Assert.Single(card.FindAll("h2 svg.icon"));
+        Assert.Equal("Pools", card.Find("h2").TextContent);
+    }
+}

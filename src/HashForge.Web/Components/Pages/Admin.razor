@@ -1,0 +1,178 @@
+@page "/admin"
+@rendermode InteractiveServer
+@inherits RefreshingComponent
+@inject INetworkStatsStore NetworkStats
+@inject IPoolOverview Overview
+@inject IConnectedMiners Miners
+@inject IPoolProvisioner Provisioner
+
+<BrandTitle Page="Admin" />
+
+<div class="page-head">
+    <h1>Admin</h1>
+    <p>Node status, pool management and connected miners. This page is only reachable from the allowed networks.</p>
+</div>
+
+<SectionCard Icon="IconKind.Storage" Title="Bitcoin node" Aside="@(_network is null ? null : $"checked {Display.Age(_network.UpdatedAt, Now)}")">
+    @if (_network is null)
+    {
+        <p class="notice">The Bitcoin node has not answered yet.</p>
+    }
+    else
+    {
+        <section class="tiles">
+            <StatTile Icon="IconKind.Sync" Label="Sync status" Value="@(_network.IsSynced ? "Synced" : "Synchronising")" Hint="@Display.Percent(_network.SyncPercent)" />
+            <StatTile Icon="IconKind.Block" Label="Blocks" Value="@Display.Count(_network.Height)" Hint="@($"of {Display.Count(_network.Headers)} headers")" />
+            <StatTile Icon="IconKind.Chain" Label="Chain" Value="@_network.Chain" />
+            <StatTile Icon="IconKind.Storage" Label="Storage" Value="@Display.Bytes(_network.SizeOnDisk)" Hint="@(_network.Pruned ? "pruned node" : "full node")" />
+        </section>
+    }
+</SectionCard>
+
+<section class="tiles">
+    <StatTile Icon="IconKind.Accepted" Label="Accepted shares" Value="@Display.Count(_totals.Accepted)" Hint="all pools" />
+    <StatTile Icon="IconKind.Rejected" Label="Rejected shares" Value="@Display.Count(_totals.Rejected)" Hint="all pools" />
+    <StatTile Icon="IconKind.Connections" Label="Connections" Value="@Display.Count(_sessions.Count)" Hint="@($"{_addresses.Count} IP addresses")" />
+</section>
+
+<SectionCard Icon="IconKind.Port" Title="Pools" Aside="@($"{_pools.Count} running")" Flush="true">
+    @if (_pools.Count == 0)
+    {
+        <p class="empty">No pools are running. Start one below.</p>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr><th>Pool</th><th>Payout</th><th class="num">Port</th><th class="num">Miners</th><th class="num">Accepted</th><th class="num">Rejected</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var pool in _pools)
+                    {
+                        <tr>
+                            <td><a href="pool/@pool.Name">@pool.Name</a></td>
+                            <td><SchemeBadge Scheme="pool.Scheme" /></td>
+                            <td class="num">@pool.Port</td>
+                            <td class="num">@pool.MinerCount</td>
+                            <td class="num">@Display.Count(pool.Stats.Accepted)</td>
+                            <td class="num">@Display.Count(pool.Stats.Rejected)</td>
+                            <td class="num"><button type="button" class="danger" @onclick="() => RemoveAsync(pool.Name)">Stop</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</SectionCard>
+
+<SectionCard Icon="IconKind.Port" Title="Start a pool"
+             Footnote="@($"Starts immediately, with no restart. Under Docker, pick a port inside the published range (ADMIN_POOL_PORT_RANGE, from {WebOptions.FirstSparePoolPort} by default).")">
+    <EditForm Model="_form" OnValidSubmit="AddAsync" FormName="add-pool" class="stack-form">
+        <label>Name <InputText @bind-Value="_form.Name" placeholder="pplns-2" /></label>
+        <label>
+            Payout
+            <InputSelect @bind-Value="_form.Scheme">
+                @foreach (var scheme in Enum.GetValues<PayoutScheme>())
+                {
+                    <option value="@scheme">@scheme.Label()</option>
+                }
+            </InputSelect>
+        </label>
+        <label>Port <InputNumber @bind-Value="_form.Port" /></label>
+        <label>Fee % <InputNumber @bind-Value="_form.FeePercent" /></label>
+        @if (_form.Scheme == PayoutScheme.FinderBonus)
+        {
+            <label>Finder bonus (BTC) <InputNumber id="finder-bonus" @bind-Value="_form.FinderBonusBitcoin" step="0.01" min="0" /></label>
+        }
+        <label>Fee address <InputText @bind-Value="_form.FeeAddress" placeholder="bc1q…" /></label>
+        <button type="submit">Start pool</button>
+    </EditForm>
+    @if (_message is not null)
+    {
+        <p class="@(_succeeded ? "success" : "notice error") form-status" role="status">@_message</p>
+    }
+</SectionCard>
+
+<SectionCard Icon="IconKind.Connections" Title="Connected miners" Aside="@($"{_sessions.Count} connections")" Flush="true">
+    @if (_sessions.Count == 0)
+    {
+        <p class="empty">No miners are connected.</p>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>IP address</th><th>Pool</th><th>Address</th><th>Workers</th>
+                        <th class="num">Difficulty</th><th class="num">Accepted</th><th class="num">Rejected</th><th>Connected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var session in _sessions)
+                    {
+                        <tr>
+                            <td class="mono">@session.RemoteAddress</td>
+                            <td>@session.PoolName</td>
+                            <td class="mono" title="@session.MinerAddress">@(session.MinerAddress is null ? "not authorised" : Display.Shorten(session.MinerAddress))</td>
+                            <td>@string.Join(", ", session.Workers)</td>
+                            <td class="num">@Display.Difficulty(session.Difficulty)</td>
+                            <td class="num">@Display.Count(session.Accepted)</td>
+                            <td class="num">@Display.Count(session.Rejected)</td>
+                            <td>@Display.Age(session.ConnectedAt, Now)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</SectionCard>
+
+@if (_addresses.Count > 0)
+{
+    <SectionCard Icon="IconKind.Network" Title="IP addresses" Aside="@($"{_addresses.Count} distinct")">
+        <ul class="ip-list">
+            @foreach (var address in _addresses)
+            {
+                <li><code>@address.Address</code> <span class="muted">× @address.Connections</span></li>
+            }
+        </ul>
+    </SectionCard>
+}
+
+@code {
+    private readonly PoolForm _form = new() { Port = WebOptions.FirstSparePoolPort };
+    private IReadOnlyList<PoolSnapshot> _pools = [];
+    private IReadOnlyList<SessionInfo> _sessions = [];
+    private IReadOnlyList<ConnectedAddress> _addresses = [];
+    private ShareTotals _totals = new(0, 0);
+    private NetworkStats? _network;
+    private string? _message;
+    private bool _succeeded;
+
+    protected override Task LoadAsync()
+    {
+        _network = NetworkStats.Current;
+        _pools = Overview.GetPools();
+        _totals = Overview.GetTotals();
+        _sessions = Miners.GetSessions();
+        _addresses = Miners.GetAddresses();
+        return Task.CompletedTask;
+    }
+
+    private async Task AddAsync()
+    {
+        var result = await Provisioner.AddAsync(_form.ToDefinition(), Cancellation);
+        _succeeded = result.Succeeded;
+        _message = result.Succeeded ? $"Pool “{_form.Name}” is now listening on port {_form.Port}." : result.Error;
+        await LoadAsync();
+    }
+
+    private async Task RemoveAsync(string name)
+    {
+        _succeeded = await Provisioner.RemoveAsync(name, Cancellation);
+        _message = _succeeded ? $"Pool “{name}” was stopped." : $"Pool “{name}” was not running.";
+        await LoadAsync();
+    }
+}

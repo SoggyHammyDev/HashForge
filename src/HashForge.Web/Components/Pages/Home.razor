@@ -1,0 +1,107 @@
+@page "/"
+@rendermode InteractiveServer
+@inherits RefreshingComponent
+@inject IPoolOverview Overview
+@inject INetworkStatsStore NetworkStats
+@inject IBlockRepository BlockRepository
+
+<BrandTitle />
+
+<div class="page-head">
+    <h1>Pools</h1>
+    <p>Live statistics for every pool on this server. Rewards are paid directly to miners in each block.</p>
+</div>
+
+@if (_network is { IsSynced: false })
+{
+    <p class="notice">The Bitcoin node is still synchronising (@Display.Percent(_network.SyncPercent)). Mining starts when it finishes.</p>
+}
+
+<section class="tiles">
+    <StatTile Icon="IconKind.Hashrate" Label="Total hashrate" Value="@Display.Hashrate(_pools.Sum(p => p.Stats.Hashrate))" Hint="all pools" />
+    <StatTile Icon="IconKind.Miners" Label="Miners" Value="@Display.Count(_pools.Sum(p => p.MinerCount))" Hint="@($"{Display.Count(_pools.Sum(p => p.WorkerCount))} workers")" />
+    <StatTile Icon="IconKind.Accepted" Label="Accepted shares" Value="@Display.Count(_totals.Accepted)" Hint="all pools" />
+    <StatTile Icon="IconKind.Rejected" Label="Rejected shares" Value="@Display.Count(_totals.Rejected)" Hint="all pools" />
+    <StatTile Icon="IconKind.Best" Label="Best share overall" Value="@StatsText.BestDifficulty(_bestShare)" Hint="@(_bestShare is null ? null : Display.Shorten(_bestShare.Worker))" />
+</section>
+
+<SectionCard Icon="IconKind.Port" Title="Pools" Aside="@($"{_pools.Count} running")" Flush="true">
+    @if (_pools.Count == 0)
+    {
+        <p class="empty">No pools are running.</p>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pool</th>
+                        <th>Payout</th>
+                        <th class="num">Port</th>
+                        <th class="num">Hashrate</th>
+                        <th class="num">Miners</th>
+                        <th class="num">Workers</th>
+                        <th class="num">Effort</th>
+                        <th class="num">Best share</th>
+                        <th>Best share by</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pool in _pools)
+                    {
+                        <tr>
+                            <td><a href="pool/@pool.Name">@pool.Name</a></td>
+                            <td><SchemeBadge Scheme="pool.Scheme" /></td>
+                            <td class="num">@pool.Port</td>
+                            <td class="num">@Display.Hashrate(pool.Stats.Hashrate)</td>
+                            <td class="num">@pool.MinerCount</td>
+                            <td class="num">@pool.WorkerCount</td>
+                            <td class="num"><EffortMeter Percent="pool.Stats.EffortPercent" /></td>
+                            <td class="num">@StatsText.BestDifficulty(pool.Stats.BestShare)</td>
+                            <td class="mono" title="@pool.Stats.BestShare?.Worker">@StatsText.BestWorker(pool.Stats.BestShare)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</SectionCard>
+
+<SectionCard Icon="IconKind.Network" Title="Bitcoin network" Aside="@(_network is null ? null : $"updated {Display.Age(_network.UpdatedAt, Now)}")">
+    @if (_network is null)
+    {
+        <p class="empty">Waiting for the Bitcoin node…</p>
+    }
+    else
+    {
+        <section class="tiles">
+            <StatTile Icon="IconKind.Block" Label="Block height" Value="@Display.Count(_network.Height)" Hint="@_network.Chain" />
+            <StatTile Icon="IconKind.Difficulty" Label="Difficulty" Value="@Display.Difficulty(_network.Difficulty)" />
+            <StatTile Icon="IconKind.Network" Label="Network hashrate" Value="@Display.Hashrate(_network.NetworkHashrate)" />
+        </section>
+    }
+</SectionCard>
+
+<SectionCard Icon="IconKind.Block" Title="Recent blocks" Flush="true">
+    <BlockTable Blocks="_blocks" Now="Now" />
+</SectionCard>
+
+@code {
+    private const int RecentBlocksOnHome = 5;
+
+    private IReadOnlyList<PoolSnapshot> _pools = [];
+    private IReadOnlyList<FoundBlock> _blocks = [];
+    private ShareTotals _totals = new(0, 0);
+    private BestShare? _bestShare;
+    private NetworkStats? _network;
+
+    protected override async Task LoadAsync()
+    {
+        _pools = Overview.GetPools();
+        _totals = Overview.GetTotals();
+        _bestShare = Overview.GetBestShare();
+        _network = NetworkStats.Current;
+        _blocks = await BlockRepository.GetRecentAsync(RecentBlocksOnHome, Cancellation);
+    }
+}

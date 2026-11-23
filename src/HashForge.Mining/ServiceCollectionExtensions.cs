@@ -1,0 +1,84 @@
+using HashForge.Mining.History;
+using HashForge.Mining.Hosting;
+using HashForge.Mining.Jobs;
+using HashForge.Mining.Network;
+using HashForge.Mining.Notifications;
+using HashForge.Mining.Payouts;
+using HashForge.Mining.Pools;
+using HashForge.Mining.Shares;
+using HashForge.Mining.State;
+using HashForge.Mining.Statistics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+
+namespace HashForge.Mining;
+
+public static class ServiceCollectionExtensions
+{
+    /// <summary>
+    /// Registers the mining engine. The host must also register an <see cref="IHotStateStore"/>,
+    /// <see cref="IBlockRepository"/>, <see cref="IPoolHistoryRepository"/> and <see cref="IPoolDefinitionStore"/>.
+    /// </summary>
+    public static IServiceCollection AddHashForgeMining(this IServiceCollection services)
+    {
+        services.AddOptions<MiningOptions>().BindConfiguration(MiningOptions.SectionName).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<MiningOptions>, MiningOptionsValidator>();
+        services.TryAddSingleton(TimeProvider.System);
+
+        services.AddSingleton<IPoolRegistry, PoolRegistry>();
+        services.AddSingleton<IPoolProvisioner, PoolProvisioner>();
+        services.AddSingleton<INetworkStatsStore, NetworkStatsStore>();
+        services.AddSingleton<IAddressScriptResolver, AddressScriptResolver>();
+        services.AddSingleton<IPayoutSchemeFactory, PayoutSchemeFactory>();
+        services.AddSingleton<IJobFactory, JobFactory>();
+        services.AddSingleton<IShareValidator, ShareValidator>();
+        services.AddSingleton<IShareProcessor, ShareProcessor>();
+        services.AddSingleton<IBlockCandidateHandler, BlockCandidateHandler>();
+        services.AddSingleton<IHotStateCoordinator, HotStateCoordinator>();
+
+        services.AddSingleton<JobManager>();
+        services.AddSingleton<IJobSource>(sp => sp.GetRequiredService<JobManager>());
+        services.AddSingleton<ITemplateSink>(sp => sp.GetRequiredService<JobManager>());
+
+        services.AddOptions<NotificationOptions>().BindConfiguration(NotificationOptions.SectionName).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<NotificationOptions>, NotificationOptionsValidator>();
+        services.AddHttpClient(DiscordWebhookChannel.HttpClientName);
+        services.AddSingleton<INotificationOutbox, NotificationOutbox>();
+        services.AddSingleton<INotificationChannel, DiscordWebhookChannel>();
+        services.AddSingleton<PoolEventNotifier>();
+        services.AddSingleton<IBestShareListener>(sp => sp.GetRequiredService<PoolEventNotifier>());
+        services.AddSingleton<IBlockObserver>(sp => sp.GetRequiredService<PoolEventNotifier>());
+
+        services.AddSingleton<StatisticsService>();
+        services.AddSingleton<IStatisticsReader>(sp => sp.GetRequiredService<StatisticsService>());
+        services.AddObserver<StatisticsService>();
+
+        services.AddSingleton<PayoutTracker>();
+        services.AddSingleton<IPayoutPlanSource>(sp => sp.GetRequiredService<PayoutTracker>());
+        services.AddObserver<PayoutTracker>();
+
+        services.AddSingleton<TemplateMonitor>();
+        services.AddSingleton<ITemplateRefresher>(sp => sp.GetRequiredService<TemplateMonitor>());
+        services.AddSingleton<IPeriodicJob>(sp => sp.GetRequiredService<TemplateMonitor>());
+        services.AddSingleton<IPeriodicJob, NetworkStatsJob>();
+        services.AddSingleton<IPeriodicJob, HotStateSnapshotJob>();
+        services.AddSingleton<IPeriodicJob, PoolHistorySampler>();
+
+        // Order matters: state is restored first, then pools are registered, then the background jobs start.
+        services.AddHostedService<HotStateLifecycleService>();
+        services.AddHostedService<PoolBootstrapService>();
+        services.AddHostedService<PeriodicJobService>();
+        services.AddHostedService<NotificationDispatcher>();
+        return services;
+    }
+
+    /// <summary>Registers one singleton as a share observer, a block observer and a persisted-state participant.</summary>
+    private static void AddObserver<T>(this IServiceCollection services)
+        where T : class, IShareObserver, IBlockObserver, IStatePersistable
+    {
+        services.AddSingleton<IShareObserver>(sp => sp.GetRequiredService<T>());
+        services.AddSingleton<IBlockObserver>(sp => sp.GetRequiredService<T>());
+        services.AddSingleton<IStatePersistable>(sp => sp.GetRequiredService<T>());
+    }
+}

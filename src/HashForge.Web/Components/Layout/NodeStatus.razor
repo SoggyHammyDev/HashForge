@@ -1,0 +1,27 @@
+@rendermode InteractiveServer
+@inherits RefreshingComponent
+@inject INetworkStatsStore NetworkStats
+
+@* The always-visible answer to "is the pool able to mine right now?" *@
+@if (_network is null)
+{
+    <StatusPill Kind="StatusKind.Neutral" Text="Connecting to node…" />
+}
+else if (_network.IsSynced)
+{
+    <StatusPill Kind="StatusKind.Good" Text="@($"{_network.Chain} · block {Display.Count(_network.Height)}")" />
+}
+else
+{
+    <StatusPill Kind="StatusKind.Busy" Text="@($"{_network.Chain} · syncing {Display.Percent(_network.SyncPercent)}")" />
+}
+
+@code {
+    private NetworkStats? _network;
+
+    protected override Task LoadAsync()
+    {
+        _network = NetworkStats.Current;
+        return Task.CompletedTask;
+    }
+}

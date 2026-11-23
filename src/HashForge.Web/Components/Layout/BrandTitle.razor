@@ -1,0 +1,9 @@
+@inject IOptions<BrandingOptions> Branding
+
+<PageTitle>@Branding.Value.PageTitle(Page)</PageTitle>
+
+@code {
+    /// <summary>The page's own name; omit it on the home page.</summary>
+    [Parameter]
+    public string? Page { get; set; }
+}

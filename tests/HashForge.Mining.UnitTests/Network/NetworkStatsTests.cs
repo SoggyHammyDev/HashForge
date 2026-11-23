@@ -1,0 +1,60 @@
+using HashForge.Bitcoin.Rpc;
+using HashForge.Mining.Network;
+using Microsoft.Extensions.Time.Testing;
+
+namespace HashForge.Mining.UnitTests.Network;
+
+public sealed class NetworkStatsTests
+{
+    private static NetworkStats Stats(bool initialBlockDownload = false, int height = 100, int headers = 100) =>
+        new("main", height, headers, 1, 2, "00", initialBlockDownload, 1, true, 5, TestData.Now);
+
+    [Fact]
+    public void GIVEN_Current_WHEN_NothingStoredYet_THEN_IsNull()
+    {
+        Assert.Null(new NetworkStatsStore().Current);
+    }
+
+    [Fact]
+    public void GIVEN_Update_WHEN_Called_THEN_CurrentReturnsLatest()
+    {
+        var store = new NetworkStatsStore();
+        var latest = Stats();
+
+        store.Update(Stats(height: 1));
+        store.Update(latest);
+
+        Assert.Same(latest, store.Current);
+    }
+
+    [Theory]
+    [InlineData(false, 100, 100, true)]
+    [InlineData(true, 100, 100, false)]
+    [InlineData(false, 99, 100, false)]
+    public void GIVEN_IsSynced_WHEN_NodeStateVaries_THEN_ReflectsDownloadAndHeaderGap(bool ibd, int height, int headers, bool expected)
+    {
+        Assert.Equal(expected, Stats(ibd, height, headers).IsSynced);
+    }
+
+    [Fact]
+    public async Task GIVEN_ExecuteAsync_WHEN_NodeResponds_THEN_StoreHoldsCombinedStats()
+    {
+        var source = Substitute.For<IChainInfoSource>();
+        source.GetChainInfoAsync(Arg.Any<CancellationToken>()).Returns(new ChainInfo
+        {
+            Chain = "main", Blocks = 850_000, Headers = 850_001, BestBlockHash = "00ab", Difficulty = 9e13,
+            InitialBlockDownload = true, VerificationProgress = 0.5, Pruned = true, SizeOnDisk = 123,
+        });
+        source.GetNetworkHashrateAsync(Arg.Any<CancellationToken>()).Returns(6e20);
+        var store = new NetworkStatsStore();
+        var job = new NetworkStatsJob(source, store, new FakeTimeProvider(TestData.Now), TestData.Options(o => o.NetworkStatsRefreshSeconds = 45));
+
+        await job.ExecuteAsync(CancellationToken.None);
+
+        Assert.Equal(
+            new NetworkStats("main", 850_000, 850_001, 9e13, 6e20, "00ab", true, 0.5, true, 123, TestData.Now),
+            store.Current);
+        Assert.Equal(TimeSpan.FromSeconds(45), job.Interval);
+        Assert.Equal("network-stats", job.Name);
+    }
+}

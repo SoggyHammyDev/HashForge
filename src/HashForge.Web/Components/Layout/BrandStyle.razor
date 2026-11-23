@@ -1,0 +1,4 @@
+@inject IOptions<BrandingOptions> Branding
+
+@* Applies the configured accent colour. The value is validated at startup, so it is safe to emit as CSS. *@
+<style>@((MarkupString)BrandTheme.CssOverrides(Branding.Value.AccentColor))</style>

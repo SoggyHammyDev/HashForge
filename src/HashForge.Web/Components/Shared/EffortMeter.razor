@@ -1,0 +1,16 @@
+@using System.Globalization
+
+@* Effort as a number with a thin bar beneath it; the bar fills at 100%, the work a block needs on average. *@
+<span class="effort">
+    <span>@Display.Percent(Percent)</span>
+    <span class="meter" aria-hidden="true"><span style="width: @BarWidth%"></span></span>
+</span>
+
+@code {
+    private const double Full = 100;
+
+    [Parameter, EditorRequired]
+    public double Percent { get; set; }
+
+    private string BarWidth => Math.Clamp(Percent, 0, Full).ToString("0.#", CultureInfo.InvariantCulture);
+}

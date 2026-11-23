@@ -1,0 +1,148 @@
+# HashForge: Bitcoin node + Redis + PostgreSQL + pool, on a private network.
+# Copy .env.example to .env, set the passwords and your fee address, then: docker compose up -d --build
+#
+# All state lives in plain folders under DATA_DIR (./data by default), not in Docker volumes,
+# so backing up or moving the pool is a matter of stopping it and copying that folder.
+
+name: hashforge
+
+services:
+  bitcoind:
+    image: hashforge-bitcoind
+    build:
+      context: ./docker/bitcoind
+      args:
+        BITCOIN_VERSION: ${BITCOIN_VERSION:-32.1}
+    restart: unless-stopped
+    # Gives the node time to flush its databases; killing it early forces a long re-check on next start.
+    stop_grace_period: 2m
+    environment:
+      NETWORK: ${NETWORK:-mainnet}
+      PRUNE_MB: ${PRUNE_MB:-550}
+      BLOCK_RESERVED_WEIGHT: ${BLOCK_RESERVED_WEIGHT:-100000}
+      DB_CACHE_MB: ${DB_CACHE_MB:-450}
+      RPC_USER: ${RPC_USER:?set RPC_USER in .env}
+      RPC_PASSWORD: ${RPC_PASSWORD:?set RPC_PASSWORD in .env}
+    volumes:
+      - ${DATA_DIR:-./data}/bitcoin:/data
+    ports:
+      # Peer-to-peer only. The RPC port is never published; the pool reaches it over the private network.
+      - "${P2P_PORT:-8333}:8333"
+    networks:
+      - hashforge
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Append-only mode keeps the pool's state snapshots across a host reboot.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ${DATA_DIR:-./data}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hashforge
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hashforge
+      POSTGRES_USER: ${POSTGRES_USER:-hashforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d hashforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hashforge
+
+  hashforge:
+    image: hashforge-pool
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      BitcoinNode__RpcUrl: http://bitcoind:8332/
+      BitcoinNode__RpcUser: ${RPC_USER}
+      BitcoinNode__RpcPassword: ${RPC_PASSWORD}
+      Persistence__RedisConnectionString: redis:6379
+      Persistence__PostgresConnectionString: Host=postgres;Database=hashforge;Username=${POSTGRES_USER:-hashforge};Password=${POSTGRES_PASSWORD}
+      Mining__CoinbaseTag: ${COINBASE_TAG:-/HashForge/}
+      # The three built-in pools. Set any *_ENABLED to false to leave that pool off.
+      Mining__Pools__0__Name: solo
+      Mining__Pools__0__Scheme: Solo
+      Mining__Pools__0__Enabled: ${SOLO_ENABLED:-true}
+      Mining__Pools__0__Port: ${SOLO_PORT:-3333}
+      Mining__Pools__0__FeePercent: ${SOLO_FEE_PERCENT:-1}
+      Mining__Pools__0__FeeAddress: ${POOL_FEE_ADDRESS:?set POOL_FEE_ADDRESS in .env}
+      Mining__Pools__1__Name: pplns
+      Mining__Pools__1__Scheme: Pplns
+      Mining__Pools__1__Enabled: ${PPLNS_ENABLED:-true}
+      Mining__Pools__1__Port: ${PPLNS_PORT:-3334}
+      Mining__Pools__1__FeePercent: ${PPLNS_FEE_PERCENT:-1}
+      Mining__Pools__1__FeeAddress: ${POOL_FEE_ADDRESS}
+      Mining__Pools__1__PplnsWindowMultiplier: ${PPLNS_WINDOW_MULTIPLIER:-2}
+      Mining__Pools__1__MaxCoinbaseOutputs: ${MAX_COINBASE_OUTPUTS:-500}
+      Mining__Pools__2__Name: prop
+      Mining__Pools__2__Scheme: Prop
+      Mining__Pools__2__Enabled: ${PROP_ENABLED:-true}
+      Mining__Pools__2__Port: ${PROP_PORT:-3335}
+      Mining__Pools__2__FeePercent: ${PROP_FEE_PERCENT:-1}
+      Mining__Pools__2__FeeAddress: ${POOL_FEE_ADDRESS}
+      Mining__Pools__2__MaxCoinbaseOutputs: ${MAX_COINBASE_OUTPUTS:-500}
+      # Optional fourth pool: the block finder gets a fixed bonus, the rest is split like PROP.
+      Mining__Pools__3__Name: bonus
+      Mining__Pools__3__Scheme: FinderBonus
+      Mining__Pools__3__Enabled: ${BONUS_ENABLED:-false}
+      Mining__Pools__3__Port: ${BONUS_PORT:-3336}
+      Mining__Pools__3__FeePercent: ${BONUS_FEE_PERCENT:-1}
+      Mining__Pools__3__FeeAddress: ${POOL_FEE_ADDRESS}
+      Mining__Pools__3__FinderBonusSatoshis: ${BONUS_FINDER_SATOSHIS:-100000000}
+      Mining__Pools__3__MaxCoinbaseOutputs: ${MAX_COINBASE_OUTPUTS:-500}
+      Stratum__InitialDifficulty: ${STRATUM_INITIAL_DIFFICULTY:-1024}
+      Stratum__MinDifficulty: ${STRATUM_MIN_DIFFICULTY:-0.001}
+      # Optional Discord notifications; leave DISCORD_WEBHOOK_URL empty to turn them off.
+      Notifications__DiscordWebhookUrl: ${DISCORD_WEBHOOK_URL:-}
+      Notifications__NotifyBlockFound: ${DISCORD_NOTIFY_BLOCK_FOUND:-true}
+      Notifications__NotifyBestShare: ${DISCORD_NOTIFY_BEST_SHARE:-true}
+      Notifications__BestShareCooldownSeconds: ${DISCORD_BEST_SHARE_COOLDOWN_SECONDS:-60}
+      Notifications__SenderName: ${BRAND_NAME:-HashForge}
+      # Present the pool under your own name, colour and logo.
+      Branding__Name: ${BRAND_NAME:-HashForge}
+      Branding__Tagline: ${BRAND_TAGLINE:-Open-source Bitcoin mining pool}
+      Branding__AccentColor: "${BRAND_ACCENT_COLOR:-#f7931a}"
+      Branding__LogoUrl: ${BRAND_LOGO_URL:-}
+      # Set to your reverse proxy's IP when the web UI sits behind one, so the admin allow-list sees real visitors.
+      Web__TrustedProxies__0: ${TRUSTED_PROXY:-}
+      Web__StratumHost: ${STRATUM_HOST:-your-pool-host}
+      Admin__AllowedNetworks__0: ${ADMIN_NETWORK_1:-192.168.0.0/24}
+      Admin__AllowedNetworks__1: ${ADMIN_NETWORK_2:-192.168.1.0/24}
+      Admin__AllowedNetworks__2: ${ADMIN_NETWORK_3:-127.0.0.0/8}
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+      - "${SOLO_PORT:-3333}:${SOLO_PORT:-3333}"
+      - "${PPLNS_PORT:-3334}:${PPLNS_PORT:-3334}"
+      - "${PROP_PORT:-3335}:${PROP_PORT:-3335}"
+      - "${BONUS_PORT:-3336}:${BONUS_PORT:-3336}"
+      # Spare ports for pools started later from the admin page.
+      - "${ADMIN_POOL_PORT_RANGE:-3337-3341}:${ADMIN_POOL_PORT_RANGE:-3337-3341}"
+    networks:
+      - hashforge
+
+networks:
+  hashforge:
+    driver: bridge

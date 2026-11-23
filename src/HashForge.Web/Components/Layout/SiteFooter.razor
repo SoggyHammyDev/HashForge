@@ -1,0 +1,27 @@
+@inject IOptions<BrandingOptions> Branding
+
+<footer class="site-footer">
+    <div class="footer-inner">
+        <span>
+            @if (Branding.Value.IsDefaultName)
+            {
+                <a href="@BrandingOptions.RepositoryUrl" target="_blank" rel="noopener">@BrandingOptions.DefaultName</a>
+            }
+            else
+            {
+                @Branding.Value.Name
+            }
+            @if (!string.IsNullOrWhiteSpace(Branding.Value.Tagline))
+            {
+                <text> · @Branding.Value.Tagline</text>
+            }
+        </span>
+        <span>
+            <a href="connect">How to connect</a> · <a href="api/pools">API</a>
+            @if (!Branding.Value.IsDefaultName)
+            {
+                <text> · Powered by <a href="@BrandingOptions.RepositoryUrl" target="_blank" rel="noopener">@BrandingOptions.DefaultName</a></text>
+            }
+        </span>
+    </div>
+</footer>

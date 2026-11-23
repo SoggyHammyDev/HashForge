@@ -1,0 +1,17 @@
+@inject IAdminAccessPolicy AdminAccess
+
+<nav class="nav">
+    <NavLink href="" Match="NavLinkMatch.All">Pools</NavLink>
+    <NavLink href="blocks">Blocks</NavLink>
+    <NavLink href="connect">Connect</NavLink>
+    @if (AdminAccess.IsAllowed(HttpContext?.Connection.RemoteIpAddress))
+    {
+        <NavLink href="admin">Admin</NavLink>
+    }
+</nav>
+
+@code {
+    /// <summary>Present because the layout is rendered on the server for each page request.</summary>
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+}

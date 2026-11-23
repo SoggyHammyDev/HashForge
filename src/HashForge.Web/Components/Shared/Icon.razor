@@ -1,0 +1,10 @@
+@* A decorative line icon. It is hidden from screen readers because the text beside it carries the meaning. *@
+@if (Kind != IconKind.None)
+{
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">@((MarkupString)IconShapes.For(Kind))</svg>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IconKind Kind { get; set; }
+}

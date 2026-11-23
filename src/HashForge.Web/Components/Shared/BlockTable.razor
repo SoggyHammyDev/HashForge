@@ -1,0 +1,55 @@
+@if (Blocks.Count == 0)
+{
+    <p class="empty">No blocks found yet.</p>
+}
+else
+{
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Height</th>
+                    <th>Pool</th>
+                    <th>Found by</th>
+                    <th class="num">Effort</th>
+                    <th class="num">Reward</th>
+                    <th class="num">Miners paid</th>
+                    <th>Found</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var block in Blocks)
+                {
+                    <tr>
+                        <td class="mono" title="@block.Hash">@block.Height</td>
+                        <td><a href="pool/@block.PoolName">@block.PoolName</a></td>
+                        <td class="mono" title="@block.Worker.FullName">@Display.Shorten(block.Worker.FullName)</td>
+                        <td class="num">@Display.Percent(block.EffortPercent)</td>
+                        <td class="num">@Display.Bitcoin(block.RewardSatoshis)</td>
+                        <td class="num">@block.MinersPaid</td>
+                        <td>@Display.Age(block.FoundAt, Now)</td>
+                        <td>
+                            @if (block.Accepted)
+                            {
+                                <StatusPill Kind="StatusKind.Good" Text="Accepted" />
+                            }
+                            else
+                            {
+                                <StatusPill Kind="StatusKind.Bad" Text="@($"Rejected: {block.RejectReason}")" />
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<FoundBlock> Blocks { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public DateTimeOffset Now { get; set; }
+}

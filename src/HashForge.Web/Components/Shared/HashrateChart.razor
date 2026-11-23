@@ -1,0 +1,79 @@
+@using System.Globalization
+
+@if (Samples.Count < 2)
+{
+    <p class="muted">The chart appears once a few readings have been collected.</p>
+}
+else
+{
+    <figure class="chart">
+        <svg viewBox="0 0 @ViewWidth @ViewHeight" role="img" aria-label="Pool hashrate over time">
+            @foreach (var fraction in GridFractions)
+            {
+                var y = Area.Bottom - (fraction * Area.Height);
+                <line class="chart-grid" x1="@F(Area.Left)" x2="@F(Area.Right)" y1="@F(y)" y2="@F(y)" />
+                @Label("chart-axis", Area.Left - 8, y + 4, "end", Display.Hashrate(_axisMaximum * fraction))
+            }
+            @Label("chart-axis", Area.Left, ViewHeight - 6, "start", TimeLabel(_points[0]))
+            @Label("chart-axis", Area.Right, ViewHeight - 6, "end", TimeLabel(_points[^1]))
+
+            <polyline class="chart-line" points="@string.Join(' ', _points.Select(p => $"{F(p.X)},{F(p.Y)}"))" />
+            <circle class="chart-end" cx="@F(_points[^1].X)" cy="@F(_points[^1].Y)" r="4" />
+            @Label("chart-value", _points[^1].X - 8, Math.Max(_points[^1].Y - 10, 12), "end", Display.Hashrate(_points[^1].Sample.Hashrate))
+
+            @foreach (var point in _points)
+            {
+                <circle class="chart-hit" cx="@F(point.X)" cy="@F(point.Y)" r="8">
+                    <title>@TimeLabel(point): @Display.Hashrate(point.Sample.Hashrate), @point.Sample.Miners miners</title>
+                </circle>
+            }
+        </svg>
+        <details>
+            <summary>Show as table</summary>
+            <div class="table-scroll">
+                <table>
+                    <thead><tr><th>Time (UTC)</th><th class="num">Hashrate</th><th class="num">Miners</th><th class="num">Workers</th></tr></thead>
+                    <tbody>
+                        @foreach (var point in _points.Reverse())
+                        {
+                            <tr>
+                                <td>@TimeLabel(point)</td>
+                                <td class="num">@Display.Hashrate(point.Sample.Hashrate)</td>
+                                <td class="num">@point.Sample.Miners</td>
+                                <td class="num">@point.Sample.Workers</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </figure>
+}
+
+@code {
+    private const double ViewWidth = 720;
+    private const double ViewHeight = 220;
+    private static readonly ChartArea Area = new(Left: 84, Top: 12, Width: 620, Height: 176);
+    private static readonly double[] GridFractions = [0, 0.5, 1];
+
+    private IReadOnlyList<ChartPoint> _points = [];
+    private double _axisMaximum = 1;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PoolHistorySample> Samples { get; set; } = [];
+
+    protected override void OnParametersSet()
+    {
+        _axisMaximum = ChartGeometry.NiceMaximum(Samples.Count == 0 ? 0 : Samples.Max(s => s.Hashrate));
+        _points = ChartGeometry.Plot(Samples, Area, _axisMaximum);
+    }
+
+    private static string F(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    /// <summary>Emits an SVG text element. Razor reserves the &lt;text&gt; tag, so it cannot be written inline.</summary>
+    private static MarkupString Label(string cssClass, double x, double y, string anchor, string content) =>
+        new($"<text class=\"{cssClass}\" x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"{anchor}\">{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    private static string TimeLabel(ChartPoint point) =>
+        point.Sample.Timestamp.UtcDateTime.ToString("d MMM HH:mm", CultureInfo.InvariantCulture);
+}

@@ -1,0 +1,22 @@
+<div class="tile">
+    <span class="tile-label"><Icon Kind="Icon" />@Label</span>
+    <span class="tile-value">@Value</span>
+    @if (!string.IsNullOrEmpty(Hint))
+    {
+        <span class="tile-hint">@Hint</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Hint { get; set; }
+
+    [Parameter]
+    public IconKind Icon { get; set; }
+}

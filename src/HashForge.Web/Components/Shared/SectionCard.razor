@@ -1,0 +1,37 @@
+@* A titled panel. Set Flush for content, such as a table, that should run edge to edge. *@
+<section class="card">
+    <header class="card-head">
+        <h2><Icon Kind="Icon" />@Title</h2>
+        @if (!string.IsNullOrEmpty(Aside))
+        {
+            <span class="card-aside">@Aside</span>
+        }
+    </header>
+    <div class="card-body @(Flush ? "flush" : null)">
+        @ChildContent
+    </div>
+    @if (!string.IsNullOrEmpty(Footnote))
+    {
+        <footer class="card-foot">@Footnote</footer>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public IconKind Icon { get; set; }
+
+    [Parameter]
+    public string? Aside { get; set; }
+
+    [Parameter]
+    public string? Footnote { get; set; }
+
+    [Parameter]
+    public bool Flush { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

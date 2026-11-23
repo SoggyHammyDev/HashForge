@@ -1,0 +1,21 @@
+@* The tiles every level shares: a pool, a miner and a worker all show the same measures. *@
+<section class="tiles">
+    <StatTile Icon="IconKind.Hashrate" Label="Hashrate" Value="@Display.Hashrate(Stats.Hashrate)" />
+    <StatTile Icon="IconKind.Effort" Label="Effort" Value="@Display.Percent(Stats.EffortPercent)" Hint="of the work a block needs on average" />
+    <StatTile Icon="IconKind.Accepted" Label="Accepted shares" Value="@Display.Count(Stats.Accepted)" />
+    <StatTile Icon="IconKind.Rejected" Label="Rejected shares" Value="@Display.Count(Stats.Rejected)" />
+    <StatTile Icon="IconKind.Best" Label="Best share" Value="@StatsText.BestDifficulty(Stats.BestShare)" Hint="@(Stats.BestShare is null ? null : Display.Shorten(Stats.BestShare.Worker))" />
+    <StatTile Icon="IconKind.Clock" Label="Last share" Value="@Display.Age(Stats.LastShareAt, Now)" />
+    @ChildContent
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public StatsSnapshot Stats { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public DateTimeOffset Now { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

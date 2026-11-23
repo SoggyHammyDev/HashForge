@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\HashForge.Stratum\HashForge.Stratum.csproj" />
+    <ProjectReference Include="..\HashForge.Persistence\HashForge.Persistence.csproj" />
+  </ItemGroup>
+</Project>

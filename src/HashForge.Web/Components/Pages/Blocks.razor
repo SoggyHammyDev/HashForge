@@ -1,0 +1,23 @@
+@page "/blocks"
+@rendermode InteractiveServer
+@inherits RefreshingComponent
+@inject IBlockRepository BlockRepository
+@inject IOptions<WebOptions> Options
+
+<BrandTitle Page="Blocks" />
+
+<div class="page-head">
+    <h1>Blocks</h1>
+    <p>Every block the pools have found, newest first. Hover a height to see the block hash.</p>
+</div>
+
+<SectionCard Icon="IconKind.Block" Title="Blocks found" Aside="@($"latest {Options.Value.RecentBlockCount}")" Flush="true">
+    <BlockTable Blocks="_blocks" Now="Now" />
+</SectionCard>
+
+@code {
+    private IReadOnlyList<FoundBlock> _blocks = [];
+
+    protected override async Task LoadAsync() =>
+        _blocks = await BlockRepository.GetRecentAsync(Options.Value.RecentBlockCount, Cancellation);
+}

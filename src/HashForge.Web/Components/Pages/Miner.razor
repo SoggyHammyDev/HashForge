@@ -1,0 +1,79 @@
+@page "/pool/{PoolName}/miner/{Address}"
+@rendermode InteractiveServer
+@inherits RefreshingComponent
+@inject IStatisticsReader Statistics
+
+<BrandTitle Page="Miner" />
+
+<div class="page-head">
+    <a class="back-link" href="pool/@Uri.EscapeDataString(PoolName)">← @PoolName</a>
+    <h1 class="wrap mono">@(_isValidAddress ? Address : "Miner")</h1>
+</div>
+
+@if (!_isValidAddress)
+{
+    <SectionCard Icon="IconKind.Rejected" Title="Not a Bitcoin address">
+        <p class="empty">The address in this link is not valid. Addresses contain only letters and digits.</p>
+    </SectionCard>
+}
+else if (_miner is null)
+{
+    <SectionCard Icon="IconKind.Clock" Title="No shares yet">
+        <p class="empty">This address has not submitted any shares to “@PoolName”.</p>
+    </SectionCard>
+}
+else
+{
+    <StatsTiles Stats="_miner.Stats" Now="Now" />
+
+    <SectionCard Icon="IconKind.Miners" Title="Workers" Aside="@($"{_miner.Workers.Count} seen")" Flush="true">
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Worker</th>
+                        <th class="num">Hashrate</th>
+                        <th class="num">Accepted</th>
+                        <th class="num">Rejected</th>
+                        <th class="num">Effort</th>
+                        <th class="num">Best share</th>
+                        <th>Last share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var worker in _miner.Workers)
+                    {
+                        <tr>
+                            <td>@worker.Name</td>
+                            <td class="num">@Display.Hashrate(worker.Stats.Hashrate)</td>
+                            <td class="num">@Display.Count(worker.Stats.Accepted)</td>
+                            <td class="num">@Display.Count(worker.Stats.Rejected)</td>
+                            <td class="num"><EffortMeter Percent="worker.Stats.EffortPercent" /></td>
+                            <td class="num">@StatsText.BestDifficulty(worker.Stats.BestShare)</td>
+                            <td>@Display.Age(worker.Stats.LastShareAt, Now)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </SectionCard>
+}
+
+@code {
+    private MinerSnapshot? _miner;
+    private bool _isValidAddress;
+
+    [Parameter]
+    public string PoolName { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Address { get; set; } = string.Empty;
+
+    protected override Task LoadAsync()
+    {
+        // The address comes straight from the URL, so it is checked before being looked up or displayed.
+        _isValidAddress = AddressFormat.IsPlausible(Address);
+        _miner = _isValidAddress ? Statistics.GetMiner(PoolName, Address) : null;
+        return Task.CompletedTask;
+    }
+}

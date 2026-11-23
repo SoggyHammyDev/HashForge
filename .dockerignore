@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.env
+tests/
+docker/
+*.md
+docs/
+data/
+data-regtest/
+.env.regtest
+
