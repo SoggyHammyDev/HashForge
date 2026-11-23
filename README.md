@@ -36,7 +36,11 @@ Core node, Redis, PostgreSQL and the pool itself.
   and is written to the log in full if every attempt fails, so it can still be submitted by hand.
 - **Limits against abuse:** validated worker names, a cap on workers per connection, connection limits,
   idle and send timeouts, and a maximum message size.
-- **No work while the node is syncing**, and new work is pushed to every miner the moment a block arrives.
+- **Instant new-block detection over ZeroMQ.** The node pushes each new block to the pool the moment it
+  accepts it, and every miner is sent fresh work at once. A one-second poll runs alongside as a safety net.
+- **Work is always delivered in order.** Each miner connection tracks the newest work it has been sent, so a
+  slower, older update can never overwrite a newer one, and a share on an out-of-date block is rejected as stale.
+- **No work while the node is syncing.**
 
 **Statistics**
 
@@ -44,14 +48,15 @@ Core node, Redis, PostgreSQL and the pool itself.
   Miner and worker counts are those seen within the hashrate window (10 minutes by default).
 - **Effort:** work submitted so far as a percentage of the work a block needs on average.
 - **Best share** per worker, per miner, per pool and overall, always with the worker that found it.
-- **Network statistics** (height, difficulty, network hashrate, sync state) refreshed by a background job.
+- **Network statistics** (height, difficulty, network hashrate, current block reward, time of the last block,
+  sync state) refreshed by a background job.
 - **Hashrate history chart** per pool and a record of every block found with its payout split.
 - **Shares are never written to a database.** They live in memory; per-miner totals are snapshotted to Redis
   every few seconds so a restart loses almost nothing.
 
 **Web UI and API**
 
-- **Blazor web UI** that updates itself over a WebSocket, with light and dark themes.
+- **Blazor web UI** that updates itself over a WebSocket, with light and dark themes and a consistent icon set.
 - **Admin page** restricted to IP ranges you choose: node sync status, connected miners and their IPs,
   share totals, pool management.
 - **Custom branding:** your own name, tagline, accent colour and logo.
@@ -91,6 +96,11 @@ docker compose up -d --build
 
 - Web UI: `http://<your-host>:8080`
 - Stratum: `stratum+tcp://<your-host>:3333` (SOLO), `:3334` (PPLNS), `:3335` (PROP), and `:3336` (BONUS, when `BONUS_ENABLED=true`)
+
+The Compose file connects the pool to the node's ZeroMQ block feed automatically. If you run the pool against
+your own node instead, start the node with `-zmqpubhashblock=tcp://0.0.0.0:28332` and set
+`BitcoinNode__ZmqBlockUrl=tcp://<node-host>:28332`; without it the pool still works but detects new blocks by
+polling once a second, and logs a warning saying so.
 
 The pool hands out no work until the node has finished synchronising. The header of every page and the admin
 page show the sync progress.
@@ -271,7 +281,7 @@ Environment variables use `__` between levels, for example `Stratum__InitialDiff
 
 | Section | Notable settings |
 |---|---|
-| `BitcoinNode` | `RpcUrl`, `RpcUser`, `RpcPassword`, `RpcTimeoutSeconds` |
+| `BitcoinNode` | `RpcUrl`, `RpcUser`, `RpcPassword`, `RpcTimeoutSeconds`, `ZmqBlockUrl` |
 | `Persistence` | `RedisConnectionString`, `RedisKeyPrefix`, `PostgresConnectionString` |
 | `Mining` | `Pools` (name, scheme `Solo`/`Prop`/`Pplns`/`FinderBonus`, port, fee, fee address, finder bonus, limits), `CoinbaseTag`, `TemplateRefreshSeconds`, `NetworkStatsRefreshSeconds`, `StateSnapshotSeconds` |
 | `Stratum` | `InitialDifficulty`, `MinDifficulty`, `MaxDifficulty`, `TargetSharesPerMinute`, `RetargetSeconds`, `IdleTimeoutSeconds`, `SendTimeoutSeconds`, `MaxConnections`, `MaxConnectionsPerAddress`, `VersionRollingMask` |
@@ -291,7 +301,7 @@ Defaults live in the options classes in the source; `appsettings.json` holds onl
 | Project | Responsibility |
 |---|---|
 | `HashForge.Domain` | Pure types and maths: difficulty, effort, payout distribution, display formatting |
-| `HashForge.Bitcoin` | Hashing, coinbase and block serialisation, merkle branches, Bitcoin Core RPC client |
+| `HashForge.Bitcoin` | Hashing, coinbase and block serialisation, merkle branches, Bitcoin Core RPC client, ZeroMQ block feed |
 | `HashForge.Mining` | Pool registry, jobs, share validation, payout schemes, statistics, background jobs, notifications |
 | `HashForge.Stratum` | Stratum V1 server: sessions, method handlers, variable difficulty, TCP transport |
 | `HashForge.Persistence` | Redis state snapshots and PostgreSQL repositories (EF Core) |
@@ -328,6 +338,7 @@ Contributions are welcome. To keep the codebase consistent:
 3. **Follow the conventions already in the code:**
    - SOLID design: small classes with one job, dependencies injected through interfaces, new behaviour added
      by adding a class (a payout scheme, a Stratum method handler, an API endpoint) rather than growing one.
+     Where something is recorded, read and saved, those are three classes over a shared store.
    - One type per file. No duplicated logic; share it instead.
    - Configuration through `IOptions<T>` with validation, logging through `ILogger` using
      `[LoggerMessage]`, and the built-in dependency injection container only.
