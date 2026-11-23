@@ -1,5 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\src\HashForge.Bitcoin\HashForge.Bitcoin.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NetMQ" />
   </ItemGroup>
 </Project>

@@ -17,4 +17,11 @@ public sealed class BitcoinNodeOptions
 
     [Range(1, 600)]
     public int RpcTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Where the node publishes new-block announcements over ZeroMQ (its -zmqpubhashblock address),
+    /// for example tcp://bitcoind:28332. Leave empty to rely on polling alone.
+    /// </summary>
+    [RegularExpression("^$|^(tcp|ipc|inproc)://.+", ErrorMessage = "ZmqBlockUrl must be empty or a ZeroMQ address such as tcp://host:28332.")]
+    public string ZmqBlockUrl { get; set; } = string.Empty;
 }

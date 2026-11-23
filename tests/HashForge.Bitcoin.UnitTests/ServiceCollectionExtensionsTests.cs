@@ -1,4 +1,5 @@
-﻿using HashForge.Bitcoin.Rpc;
+using HashForge.Bitcoin.Notifications;
+using HashForge.Bitcoin.Rpc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -59,5 +60,32 @@ public sealed class ServiceCollectionExtensionsTests
 
         Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<BitcoinNodeOptions>>().Value);
     }
-}
 
+    [Fact]
+    public void GIVEN_AddHashForgeBitcoin_WHEN_ZmqAddressConfigured_THEN_BlockNotificationsAreEnabled()
+    {
+        var settings = ValidSettings();
+        settings["BitcoinNode:ZmqBlockUrl"] = "tcp://node:28332";
+        using var provider = BuildProvider(settings);
+
+        Assert.True(provider.GetRequiredService<IBlockNotificationSource>().IsEnabled);
+    }
+
+    [Fact]
+    public void GIVEN_AddHashForgeBitcoin_WHEN_NoZmqAddressConfigured_THEN_BlockNotificationsAreDisabled()
+    {
+        using var provider = BuildProvider(ValidSettings());
+
+        Assert.False(provider.GetRequiredService<IBlockNotificationSource>().IsEnabled);
+    }
+
+    [Fact]
+    public void GIVEN_AddHashForgeBitcoin_WHEN_ZmqAddressIsNotAZeroMqAddress_THEN_OptionsValidationFails()
+    {
+        var settings = ValidSettings();
+        settings["BitcoinNode:ZmqBlockUrl"] = "http://node:28332";
+        using var provider = BuildProvider(settings);
+
+        Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<BitcoinNodeOptions>>().Value);
+    }
+}

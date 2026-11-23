@@ -26,7 +26,7 @@ services:
     volumes:
       - ${DATA_DIR:-./data}/bitcoin:/data
     ports:
-      # Peer-to-peer only. The RPC port is never published; the pool reaches it over the private network.
+      # Peer-to-peer only. The RPC and ZeroMQ ports are never published; the pool reaches them over the private network.
       - "${P2P_PORT:-8333}:8333"
     networks:
       - hashforge
@@ -79,6 +79,8 @@ services:
       BitcoinNode__RpcUrl: http://bitcoind:8332/
       BitcoinNode__RpcUser: ${RPC_USER}
       BitcoinNode__RpcPassword: ${RPC_PASSWORD}
+      # The node pushes each new block here the instant it arrives, so miners switch work without delay.
+      BitcoinNode__ZmqBlockUrl: tcp://bitcoind:28332
       Persistence__RedisConnectionString: redis:6379
       Persistence__PostgresConnectionString: Host=postgres;Database=hashforge;Username=${POSTGRES_USER:-hashforge};Password=${POSTGRES_PASSWORD}
       Mining__CoinbaseTag: ${COINBASE_TAG:-/HashForge/}

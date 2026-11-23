@@ -58,9 +58,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPayoutPlanSource>(sp => sp.GetRequiredService<PayoutTracker>());
         services.AddObserver<PayoutTracker>();
 
-        services.AddSingleton<TemplateMonitor>();
-        services.AddSingleton<ITemplateRefresher>(sp => sp.GetRequiredService<TemplateMonitor>());
-        services.AddSingleton<IPeriodicJob>(sp => sp.GetRequiredService<TemplateMonitor>());
+        services.AddSingleton<INodeReadiness, NodeReadiness>();
+        services.AddSingleton<ITemplateRefresher, TemplateRefresher>();
+        services.AddSingleton<IPeriodicJob, ChainTipPoller>();
         services.AddSingleton<IPeriodicJob, NetworkStatsJob>();
         services.AddSingleton<IPeriodicJob, HotStateSnapshotJob>();
         services.AddSingleton<IPeriodicJob, PoolHistorySampler>();
@@ -70,6 +70,7 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<PoolBootstrapService>();
         services.AddHostedService<PeriodicJobService>();
         services.AddHostedService<NotificationDispatcher>();
+        services.AddHostedService<BlockNotificationListener>();
         return services;
     }
 
@@ -77,8 +78,8 @@ public static class ServiceCollectionExtensions
     private static void AddObserver<T>(this IServiceCollection services)
         where T : class, IShareObserver, IBlockObserver, IStatePersistable
     {
+        services.AddSingleton<IStatePersistable>(sp => sp.GetRequiredService<T>());
         services.AddSingleton<IShareObserver>(sp => sp.GetRequiredService<T>());
         services.AddSingleton<IBlockObserver>(sp => sp.GetRequiredService<T>());
-        services.AddSingleton<IStatePersistable>(sp => sp.GetRequiredService<T>());
     }
 }

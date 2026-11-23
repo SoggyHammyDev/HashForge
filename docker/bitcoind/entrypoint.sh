@@ -52,6 +52,7 @@ exec $RUN_AS bitcoind \
     -rpcport=8332 \
     -port=8333 \
     -listenonion=0 \
+    -zmqpubhashblock=tcp://0.0.0.0:28332 \
     -dbcache="$DB_CACHE_MB" \
     -blockreservedweight="$BLOCK_RESERVED_WEIGHT" \
     "$PRUNE_FLAG" \

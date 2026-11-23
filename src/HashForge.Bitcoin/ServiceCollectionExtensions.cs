@@ -1,5 +1,6 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
+using HashForge.Bitcoin.Notifications;
 using HashForge.Bitcoin.Rpc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -18,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient(BitcoinRpcInvoker.HttpClientName, ConfigureClient);
         services.AddSingleton<IBitcoinRpcInvoker, BitcoinRpcInvoker>();
 
+        services.AddSingleton<IBlockNotificationSource, ZmqBlockNotificationSource>();
         services.AddSingleton<BitcoinNodeClient>();
         services.AddSingleton<IBlockTemplateSource>(sp => sp.GetRequiredService<BitcoinNodeClient>());
         services.AddSingleton<IBlockSubmitter>(sp => sp.GetRequiredService<BitcoinNodeClient>());

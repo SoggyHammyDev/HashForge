@@ -57,8 +57,9 @@ RUN ln -s "$(find /opt/bitcoin -type f -name bitcoind | head -n 1)" /usr/local/b
 # Starts as root only so the entrypoint can take ownership of the mounted data folder; it then drops to "bitcoin".
 VOLUME /data
 
-# 8332 = RPC (internal to the Docker network), 8333 = peer-to-peer. The same ports are used on every network.
-EXPOSE 8332 8333
+# 8332 = RPC and 28332 = ZeroMQ block announcements (both internal to the Docker network), 8333 = peer-to-peer.
+# The same ports are used on every network.
+EXPOSE 8332 8333 28332
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 CMD ["healthcheck.sh"]
 ENTRYPOINT ["entrypoint.sh"]
