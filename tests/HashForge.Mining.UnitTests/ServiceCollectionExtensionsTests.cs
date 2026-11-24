@@ -80,8 +80,9 @@ public sealed class ServiceCollectionExtensionsTests
         Assert.Equal([statistics, payouts], provider.GetServices<IShareObserver>());
         Assert.Equal([notifier, statistics, payouts], provider.GetServices<IBlockObserver>());
         Assert.Equal([notifier], provider.GetServices<IBestShareListener>());
-        Assert.Equal(["statistics", "payouts"], provider.GetServices<IStatePersistable>().Select(s => s.StateKey));
+        Assert.Equal(["statistics", "payouts", "miner-history"], provider.GetServices<IStatePersistable>().Select(s => s.StateKey));
         Assert.IsType<StatisticsReader>(provider.GetRequiredService<IStatisticsReader>());
+        Assert.Same(provider.GetRequiredService<MinerHistoryStore>(), provider.GetRequiredService<IMinerHistory>());
         Assert.IsType<NetworkDifficulty>(provider.GetRequiredService<INetworkDifficulty>());
         Assert.IsType<PayoutPlanSource>(provider.GetRequiredService<IPayoutPlanSource>());
         Assert.Same(provider.GetRequiredService<IStatisticsStore>(), provider.GetRequiredService<IStatisticsStore>());
@@ -97,7 +98,7 @@ public sealed class ServiceCollectionExtensionsTests
 
         var jobs = provider.GetServices<IPeriodicJob>().Select(j => j.Name);
 
-        Assert.Equal(["chain-tip-poller", "network-stats", "state-snapshot", "pool-history"], jobs);
+        Assert.Equal(["chain-tip-poller", "network-stats", "state-snapshot", "pool-history", "miner-history"], jobs);
     }
 
     [Fact]

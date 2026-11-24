@@ -27,5 +27,9 @@ public sealed class MiningOptions
 
     public double StateSnapshotSeconds { get; set; } = 10;
 
+    /// <summary>How often pool and miner hashrates are recorded for the charts.</summary>
     public double HistorySampleMinutes { get; set; } = 5;
+
+    /// <summary>How far back each miner's hashrate chart goes.</summary>
+    public double MinerHistoryHours { get; set; } = 24;
 }

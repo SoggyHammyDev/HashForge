@@ -656,4 +656,42 @@ public sealed class ComponentTests : WebTestContext
         var reward = home.FindAll(".tile").Single(t => t.TextContent.Contains("Block reward"));
         Assert.Equal(Display.None, reward.QuerySelector(".tile-value")!.TextContent);
     }
-}
+
+    [Fact]
+    public void GIVEN_Miner_WHEN_HistoryExists_THEN_ShowsHashrateChartWithoutMinerCounts()
+    {
+        Statistics.GetMiner("pplns", "bc1qalicealicealice").Returns(new MinerSnapshot("bc1qalicealicealice", Stats(), []));
+        MinerHistory.Get("pplns", "bc1qalicealicealice").Returns(
+        [
+            new MinerHistorySample(Now.AddMinutes(-10).ToUnixTimeSeconds(), 4.1e12, 2),
+            new MinerHistorySample(Now.AddMinutes(-5).ToUnixTimeSeconds(), 4.6e12, 2),
+            new MinerHistorySample(Now.ToUnixTimeSeconds(), 4.8e12, 1),
+        ]);
+
+        var miner = Render<Miner>(p => p.Add(x => x.PoolName, "pplns").Add(x => x.Address, "bc1qalicealicealice"));
+
+        Assert.Equal("Miner hashrate over time", miner.Find("svg[role=img]").GetAttribute("aria-label"));
+        Assert.Equal(3, miner.FindAll("circle.chart-hit").Count);
+        Assert.Contains("4.8 TH/s", miner.Find("text.chart-value").TextContent);
+        Assert.Contains("last 24 hours", miner.Markup);
+        Assert.DoesNotContain("Miners</th>", miner.Markup);
+        Assert.DoesNotContain("miners</title>", miner.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_Miner_WHEN_NoHistoryYet_THEN_ChartShowsPlaceholder()
+    {
+        Statistics.GetMiner("pplns", "bc1qalicealicealice").Returns(new MinerSnapshot("bc1qalicealicealice", Stats(), []));
+
+        var miner = Render<Miner>(p => p.Add(x => x.PoolName, "pplns").Add(x => x.Address, "bc1qalicealicealice"));
+
+        Assert.Contains("The chart appears once a few readings have been collected", miner.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_Miner_WHEN_AddressIsInvalid_THEN_HistoryIsNeverLookedUp()
+    {
+        Render<Miner>(p => p.Add(x => x.PoolName, "pplns").Add(x => x.Address, "<script>"));
+
+        MinerHistory.DidNotReceiveWithAnyArgs().Get(default!, default!);
+    }}

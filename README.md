@@ -51,11 +51,13 @@ Core node, Redis, PostgreSQL and the pool itself.
 
 - **Live figures for every pool, miner and worker:** hashrate, accepted and rejected shares, last share.
   Miner and worker counts are those seen within the hashrate window (10 minutes by default).
-- **Effort:** work submitted so far as a percentage of the work a block needs on average.
+- **Effort:** work submitted so far as a percentage of the work a block needs on average, measured against the
+  difficulty of the block actually being mined.
 - **Best share** per worker, per miner, per pool and overall, always with the worker that found it.
 - **Network statistics** (height, difficulty, network hashrate, current block reward, time of the last block,
   sync state) refreshed by a background job every 30 seconds (`NETWORK_STATS_REFRESH_SECONDS`).
-- **Hashrate history chart** per pool and a record of every block found with its payout split.
+- **Hashrate history charts** per pool and per miner (the last 24 hours on each miner's page), and a record of
+  every block found with its payout split.
 - **Shares are never written to a database.** They live in memory; per-miner totals are snapshotted to Redis
   every few seconds so a restart loses almost nothing.
 
@@ -174,7 +176,7 @@ of 100000 covers 500 outputs, so raise both together (roughly 200 weight units p
 
 ### What happens on a restart
 
-Per-miner work totals, share counters, effort and best shares are written to Redis every 10 seconds and once
+Per-miner work totals, share counters, effort, best shares and hashrate history are written to Redis every 10 seconds and once
 more on shutdown, then read back before any Stratum port opens. A hard crash can lose up to the last 10
 seconds of shares. Hashrate figures are not stored; they rebuild over the first few minutes.
 
@@ -295,7 +297,7 @@ Environment variables use `__` between levels, for example `Stratum__InitialDiff
 |---|---|
 | `BitcoinNode` | `RpcUrl`, `RpcUser`, `RpcPassword`, `RpcTimeoutSeconds`, `ZmqBlockUrl` |
 | `Persistence` | `RedisConnectionString`, `RedisKeyPrefix`, `PostgresConnectionString` |
-| `Mining` | `Pools` (name, scheme `Solo`/`Prop`/`Pplns`/`FinderBonus`, port, fee, fee address, finder bonus, limits), `CoinbaseTag`, `TemplateRefreshSeconds`, `NetworkStatsRefreshSeconds`, `StateSnapshotSeconds` |
+| `Mining` | `Pools` (name, scheme `Solo`/`Prop`/`Pplns`/`FinderBonus`, port, fee, fee address, finder bonus, limits), `CoinbaseTag`, `TemplateRefreshSeconds`, `NetworkStatsRefreshSeconds`, `StateSnapshotSeconds`, `HistorySampleMinutes`, `MinerHistoryHours` |
 | `Stratum` | `InitialDifficulty`, `MinDifficulty`, `MaxDifficulty`, `TargetSharesPerMinute`, `RetargetSeconds`, `IdleTimeoutSeconds`, `SendTimeoutSeconds`, `MaxConnections`, `MaxConnectionsPerAddress`, `VersionRollingMask` |
 | `Notifications` | `DiscordWebhookUrl`, `NotifyBlockFound`, `NotifyBestShare`, `BestShareCooldownSeconds` |
 | `Web` | `RefreshSeconds`, `StratumHost`, `RecentBlockCount`, `ChartHours`, `TrustedProxies` |

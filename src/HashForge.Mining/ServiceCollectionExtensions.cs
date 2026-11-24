@@ -69,6 +69,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPeriodicJob, HotStateSnapshotJob>();
         services.AddSingleton<IPeriodicJob, PoolHistorySampler>();
 
+        services.AddSingleton<MinerHistoryStore>();
+        services.AddSingleton<IMinerHistory>(sp => sp.GetRequiredService<MinerHistoryStore>());
+        services.AddSingleton<IStatePersistable, MinerHistoryState>();
+        services.AddSingleton<IPeriodicJob, MinerHistorySampler>();
+
         // Order matters: state is restored first, then pools are registered, then the background jobs start.
         services.AddHostedService<HotStateLifecycleService>();
         services.AddHostedService<PoolBootstrapService>();

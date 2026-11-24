@@ -32,7 +32,8 @@ public sealed class MiningOptionsValidator : IValidateOptions<MiningOptions>
             (nameof(options.NetworkStatsRefreshSeconds), options.NetworkStatsRefreshSeconds),
             (nameof(options.HashrateWindowMinutes), options.HashrateWindowMinutes),
             (nameof(options.StateSnapshotSeconds), options.StateSnapshotSeconds),
-            (nameof(options.HistorySampleMinutes), options.HistorySampleMinutes)));
+            (nameof(options.HistorySampleMinutes), options.HistorySampleMinutes),
+            (nameof(options.MinerHistoryHours), options.MinerHistoryHours)));
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }

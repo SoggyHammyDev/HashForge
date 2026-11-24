@@ -45,6 +45,8 @@ public abstract class WebTestContext : BunitContext
         Services.AddSingleton(AdminAccess);
         Templates.Status.Returns(new TemplateStatus(null, DateTimeOffset.MinValue));
         Services.AddSingleton(Templates);
+        Services.AddSingleton(MinerHistory);
+        Services.AddSingleton(Options.Create(new HashForge.Mining.MiningOptions()));
         Services.AddSingleton<INetworkDifficulty>(new NetworkDifficulty(Templates, NetworkStats));
     }
 
@@ -71,6 +73,8 @@ public abstract class WebTestContext : BunitContext
     protected IPoolRegistry Registry { get; } = Substitute.For<IPoolRegistry>();
 
     protected ITemplateRefresher Templates { get; } = Substitute.For<ITemplateRefresher>();
+
+    protected IMinerHistory MinerHistory { get; } = Substitute.For<IMinerHistory>();
 
     protected IAdminAccessPolicy AdminAccess { get; } = Substitute.For<IAdminAccessPolicy>();
 

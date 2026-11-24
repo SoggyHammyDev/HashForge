@@ -7,7 +7,7 @@
 else
 {
     <figure class="chart">
-        <svg viewBox="0 0 @ViewWidth @ViewHeight" role="img" aria-label="Pool hashrate over time">
+        <svg viewBox="0 0 @ViewWidth @ViewHeight" role="img" aria-label="@Description">
             @foreach (var fraction in GridFractions)
             {
                 var y = Area.Bottom - (fraction * Area.Height);
@@ -24,7 +24,7 @@ else
             @foreach (var point in _points)
             {
                 <circle class="chart-hit" cx="@F(point.X)" cy="@F(point.Y)" r="8">
-                    <title>@TimeLabel(point): @Display.Hashrate(point.Sample.Hashrate), @point.Sample.Miners miners</title>
+                    <title>@TimeLabel(point): @Display.Hashrate(point.Sample.Hashrate)@(ShowMiners ? $", {point.Sample.Miners} miners" : string.Empty)</title>
                 </circle>
             }
         </svg>
@@ -32,14 +32,17 @@ else
             <summary>Show as table</summary>
             <div class="table-scroll">
                 <table>
-                    <thead><tr><th>Time (UTC)</th><th class="num">Hashrate</th><th class="num">Miners</th><th class="num">Workers</th></tr></thead>
+                    <thead><tr><th>Time (UTC)</th><th class="num">Hashrate</th>@if (ShowMiners) { <th class="num">Miners</th> }<th class="num">Workers</th></tr></thead>
                     <tbody>
                         @foreach (var point in _points.Reverse())
                         {
                             <tr>
                                 <td>@TimeLabel(point)</td>
                                 <td class="num">@Display.Hashrate(point.Sample.Hashrate)</td>
-                                <td class="num">@point.Sample.Miners</td>
+                                @if (ShowMiners)
+                                {
+                                    <td class="num">@point.Sample.Miners</td>
+                                }
                                 <td class="num">@point.Sample.Workers</td>
                             </tr>
                         }
@@ -61,6 +64,14 @@ else
 
     [Parameter, EditorRequired]
     public IReadOnlyList<PoolHistorySample> Samples { get; set; } = [];
+
+    /// <summary>What the chart shows, for screen readers.</summary>
+    [Parameter]
+    public string Description { get; set; } = "Pool hashrate over time";
+
+    /// <summary>Whether the miner count is shown; it is meaningless on a single miner's chart.</summary>
+    [Parameter]
+    public bool ShowMiners { get; set; } = true;
 
     protected override void OnParametersSet()
     {
