@@ -16,4 +16,11 @@ public sealed record ShareSubmission(
     string? VersionBitsHex,
     uint VersionMask,
     double Difficulty,
-    double? PreviousDifficulty);
+    double? PreviousDifficulty)
+{
+    /// <summary>
+    /// False when the job was never sent on the miner's current connection, such as work carried over a
+    /// reconnect. That work was built with another extranonce, so it can only ever be stale.
+    /// </summary>
+    public bool JobWasSent { get; init; } = true;
+}

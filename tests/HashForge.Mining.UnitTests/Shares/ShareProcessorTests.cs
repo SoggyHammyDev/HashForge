@@ -90,6 +90,15 @@ public sealed class ShareProcessorTests
     }
 
     [Fact]
+    public async Task GIVEN_ProcessAsync_WHEN_JobWasNeverSentOnTheConnection_THEN_ShareIsStaleWithoutBeingHashed()
+    {
+        var result = await Processor().ProcessAsync(TestData.Submission(_job) with { JobWasSent = false }, CancellationToken.None);
+
+        Assert.Equal(ShareOutcome.StaleJob, result.Outcome);
+        _validator.DidNotReceiveWithAnyArgs().Validate(default!, default!);
+    }
+
+    [Fact]
     public async Task GIVEN_ProcessAsync_WHEN_JobBelongsToAnotherPool_THEN_ShareIsStale()
     {
         var result = await Processor().ProcessAsync(TestData.Submission(_job, poolName: "pplns"), CancellationToken.None);

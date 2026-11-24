@@ -18,7 +18,7 @@ public sealed partial class ShareProcessor(
     {
         ArgumentNullException.ThrowIfNull(submission);
 
-        var job = jobSource.Find(submission.JobId);
+        var job = submission.JobWasSent ? jobSource.Find(submission.JobId) : null;
         var validation = job is not null && string.Equals(job.Pool.Name, submission.PoolName, StringComparison.OrdinalIgnoreCase)
             ? validator.Validate(submission, job)
             : ShareValidation.Rejected(ShareOutcome.StaleJob);

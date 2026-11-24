@@ -1,12 +1,18 @@
+using System.Globalization;
 using HashForge.Domain;
 using HashForge.Mining.Shares;
 using HashForge.Stratum.Protocol;
 using HashForge.Stratum.Sessions;
+using Microsoft.Extensions.Logging;
 
 namespace HashForge.Stratum.Handlers;
 
 /// <summary>mining.submit: checks a share and retargets the connection's difficulty when needed.</summary>
-public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender workSender, TimeProvider timeProvider) : IStratumMethodHandler
+public sealed partial class SubmitHandler(
+    IShareProcessor shareProcessor,
+    IWorkSender workSender,
+    TimeProvider timeProvider,
+    ILogger<SubmitHandler> logger) : IStratumMethodHandler
 {
     private const int UsernameIndex = 0;
     private const int JobIdIndex = 1;
@@ -27,10 +33,11 @@ public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender wo
             return StratumReply.Fail(StratumError.Unauthorized);
         }
 
+        var jobId = request.GetString(JobIdIndex) ?? string.Empty;
         var submission = new ShareSubmission(
             session.Pool.Name,
             worker,
-            request.GetString(JobIdIndex) ?? string.Empty,
+            jobId,
             session.Extranonce1,
             request.GetString(Extranonce2Index) ?? string.Empty,
             request.GetString(TimeIndex) ?? string.Empty,
@@ -38,12 +45,16 @@ public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender wo
             request.GetString(VersionBitsIndex),
             session.VersionMask,
             session.VarDiff.Difficulty,
-            session.VarDiff.PreviousDifficulty);
+            session.VarDiff.PreviousDifficulty)
+        {
+            JobWasSent = session.Jobs.HasSent(jobId),
+        };
 
         var result = await shareProcessor.ProcessAsync(submission, cancellationToken).ConfigureAwait(false);
         session.Shares.Count(result.IsAccepted);
         if (!result.IsAccepted)
         {
+            LogRejection(username, submission, result);
             return StratumReply.Fail(ToError(result.Outcome));
         }
 
@@ -60,6 +71,28 @@ public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender wo
         await workSender.SendJobAsync(session, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Every rejection is logged with what was needed to accept it, so it can be explained afterwards.</summary>
+    private void LogRejection(string username, ShareSubmission submission, ShareResult result)
+    {
+        if (!logger.IsEnabled(LogLevel.Information))
+        {
+            return;
+        }
+
+        var worker = LogText.Clean(username);
+        var jobId = LogText.Clean(submission.JobId);
+        var previous = submission.PreviousDifficulty?.ToString(CultureInfo.InvariantCulture) ?? "none";
+        LogShareRejected(
+            result.Outcome,
+            worker,
+            submission.PoolName,
+            jobId,
+            submission.JobWasSent,
+            result.ActualDifficulty,
+            submission.Difficulty,
+            previous);
+    }
+
     private static StratumError ToError(ShareOutcome outcome) => outcome switch
     {
         ShareOutcome.StaleJob => StratumError.JobNotFound,
@@ -67,4 +100,18 @@ public sealed class SubmitHandler(IShareProcessor shareProcessor, IWorkSender wo
         ShareOutcome.LowDifficulty => StratumError.LowDifficulty,
         _ => StratumError.Malformed,
     };
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Share rejected as {Outcome} from {Worker} on pool {Pool}: job {JobId} (sent on this connection: {JobWasSent}), "
+            + "share difficulty {ShareDifficulty}, required {RequiredDifficulty}, previously {PreviousDifficulty}")]
+    private partial void LogShareRejected(
+        ShareOutcome outcome,
+        string worker,
+        string pool,
+        string jobId,
+        bool jobWasSent,
+        double shareDifficulty,
+        double requiredDifficulty,
+        string previousDifficulty);
 }

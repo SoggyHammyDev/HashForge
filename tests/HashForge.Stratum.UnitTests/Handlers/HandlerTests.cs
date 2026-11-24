@@ -18,17 +18,19 @@ public sealed class HandlerTests
     private readonly IShareProcessor _processor = Substitute.For<IShareProcessor>();
     private readonly FakeTimeProvider _time = new(StratumTestKit.Now);
     private readonly ILogger<AuthorizeHandler> _authorizeLogger = Substitute.For<ILogger<AuthorizeHandler>>();
+    private readonly ILogger<SubmitHandler> _submitLogger = Substitute.For<ILogger<SubmitHandler>>();
 
     public HandlerTests()
     {
         _authorizeLogger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
+        _submitLogger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
         _resolver.ResolveAsync(StratumTestKit.MinerAddress, Arg.Any<CancellationToken>()).Returns(new AddressResolution(true, [0x51], null));
         _resolver.ResolveAsync("bc1qbadaddress00000", Arg.Any<CancellationToken>()).Returns(new AddressResolution(false, null, "Invalid checksum"));
     }
 
     private AuthorizeHandler Authorize() => new(_resolver, _workSender, _authorizeLogger);
 
-    private SubmitHandler Submit() => new(_processor, _workSender, _time);
+    private SubmitHandler Submit() => new(_processor, _workSender, _time, _submitLogger);
 
     private StratumSession SubscribedSession()
     {
@@ -269,6 +271,36 @@ public sealed class HandlerTests
 
         Assert.Equal(expectedCode, reply.Error!.Code);
         Assert.Equal((0L, 1L), (session.ToInfo().Accepted, session.ToInfo().Rejected));
+    }
+
+    [Fact]
+    public async Task GIVEN_Submit_WHEN_JobWasSentOnThisConnection_THEN_SubmissionSaysSo()
+    {
+        var session = StratumTestKit.AuthorizedSession(_connection);
+        await session.Jobs.SendAsync(HandlerTestData.Job(session.Pool), CancellationToken.None);
+        ProcessorReturns(ShareOutcome.Accepted);
+
+        await Submit().HandleAsync(session, SubmitRequest(), CancellationToken.None);
+
+        await _processor.Received(1).ProcessAsync(Arg.Is<ShareSubmission>(s => s.JobId == "a1" && s.JobWasSent), Arg.Any<CancellationToken>());
+        Assert.DoesNotContain(_submitLogger.ReceivedCalls(), c => c.GetMethodInfo().Name == nameof(ILogger.Log));
+    }
+
+    [Fact]
+    public async Task GIVEN_Submit_WHEN_JobWasNeverSentOnThisConnection_THEN_SubmissionIsMarkedAndRejectionIsLogged()
+    {
+        var session = StratumTestKit.AuthorizedSession(_connection);
+        ProcessorReturns(ShareOutcome.StaleJob);
+
+        await Submit().HandleAsync(session, SubmitRequest(), CancellationToken.None);
+
+        await _processor.Received(1).ProcessAsync(Arg.Is<ShareSubmission>(s => s.JobId == "a1" && !s.JobWasSent), Arg.Any<CancellationToken>());
+        var logged = Assert.Single(_submitLogger.ReceivedCalls(), c => c.GetMethodInfo().Name == nameof(ILogger.Log));
+        Assert.Equal(LogLevel.Information, logged.GetArguments()[0]);
+        Assert.Equal(
+            "Share rejected as StaleJob from bc1qmineraddress000.rig1 on pool solo: job a1 (sent on this connection: False), "
+            + "share difficulty 2000, required 1024, previously none",
+            logged.GetArguments()[2]!.ToString());
     }
 
     [Fact]

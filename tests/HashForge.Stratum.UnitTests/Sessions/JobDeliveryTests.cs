@@ -72,6 +72,36 @@ public sealed class JobDeliveryTests
     }
 
     [Fact]
+    public async Task GIVEN_HasSent_WHEN_JobsWereSentOnSameTip_THEN_AllOfThemAreKnownWhateverTheCase()
+    {
+        await _delivery.SendAsync(Job("a1", 1, TipA), CancellationToken.None);
+        await _delivery.SendAsync(Job("a2", 2, TipA), CancellationToken.None);
+
+        Assert.True(_delivery.HasSent("a1"));
+        Assert.True(_delivery.HasSent("A2"));
+        Assert.False(_delivery.HasSent("a3"));
+    }
+
+    [Fact]
+    public async Task GIVEN_HasSent_WHEN_ChainTipChanged_THEN_JobsFromOldTipAreForgotten()
+    {
+        await _delivery.SendAsync(Job("1", 1, TipA), CancellationToken.None);
+        await _delivery.SendAsync(Job("2", 2, TipB), CancellationToken.None);
+
+        Assert.False(_delivery.HasSent("1"));
+        Assert.True(_delivery.HasSent("2"));
+    }
+
+    [Fact]
+    public async Task GIVEN_HasSent_WHEN_JobWasDroppedAsOutOfDate_THEN_ItIsNotKnown()
+    {
+        await _delivery.SendAsync(Job("new", 5, TipB), CancellationToken.None);
+        await _delivery.SendAsync(Job("old", 4, TipB), CancellationToken.None);
+
+        Assert.False(_delivery.HasSent("old"));
+    }
+
+    [Fact]
     public async Task GIVEN_SendAsync_WHEN_ManyJobsRaceInRandomOrder_THEN_MinerOnlyEverMovesForward()
     {
         var jobs = Enumerable.Range(1, 200).Select(i => Job(i.ToString("x"), i, i % 10 == 0 ? TipB : TipA)).ToList();
