@@ -204,4 +204,18 @@ public sealed class DatabaseTests : IDisposable
 
         Assert.Null(await repository.FindAsync("hash-9", CancellationToken.None));
     }
+
+    [Fact]
+    public async Task GIVEN_GetRecentForPoolAsync_WHEN_SeveralPoolsHaveBlocks_THEN_ReturnsOnlyThatPoolsNewestFirstUpToCount()
+    {
+        var repository = new EfBlockRepository(_factory);
+        await repository.AddAsync(Block(1, Now), CancellationToken.None);
+        await repository.AddAsync(Block(2, Now.AddHours(1)) with { PoolName = "solo" }, CancellationToken.None);
+        await repository.AddAsync(Block(3, Now.AddHours(2)), CancellationToken.None);
+        await repository.AddAsync(Block(4, Now.AddHours(3)), CancellationToken.None);
+
+        var recent = await repository.GetRecentForPoolAsync("pplns", 2, CancellationToken.None);
+
+        Assert.Equal([4, 3], recent.Select(b => b.Height));
+    }
 }

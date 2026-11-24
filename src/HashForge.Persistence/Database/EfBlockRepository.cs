@@ -19,7 +19,16 @@ public sealed class EfBlockRepository(IDbContextFactory<HashForgeDbContext> cont
         }
     }
 
-    public async Task<IReadOnlyList<FoundBlock>> GetRecentAsync(int count, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<FoundBlock>> GetRecentAsync(int count, CancellationToken cancellationToken) =>
+        GetRecentAsync(null, count, cancellationToken);
+
+    public Task<IReadOnlyList<FoundBlock>> GetRecentForPoolAsync(string poolName, int count, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(poolName);
+        return GetRecentAsync(poolName, count, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<FoundBlock>> GetRecentAsync(string? poolName, int count, CancellationToken cancellationToken)
     {
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await using (context.ConfigureAwait(false))
@@ -27,6 +36,7 @@ public sealed class EfBlockRepository(IDbContextFactory<HashForgeDbContext> cont
             var entities = await context.Blocks
                 .AsNoTracking()
                 .Include(b => b.Payouts)
+                .Where(b => poolName == null || b.PoolName == poolName)
                 .OrderByDescending(b => b.FoundAt)
                 .ThenByDescending(b => b.Id)
                 .Take(count)

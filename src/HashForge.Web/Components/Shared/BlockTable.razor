@@ -9,7 +9,10 @@ else
             <thead>
                 <tr>
                     <th>Height</th>
-                    <th>Pool</th>
+                    @if (ShowPool)
+                    {
+                        <th>Pool</th>
+                    }
                     <th>Found by</th>
                     <th class="num">Effort</th>
                     <th class="num">Reward</th>
@@ -23,7 +26,10 @@ else
                 {
                     <tr>
                         <td class="mono"><a href="block/@block.Hash" title="@block.Hash">@block.Height</a></td>
-                        <td><a href="pool/@block.PoolName">@block.PoolName</a></td>
+                        @if (ShowPool)
+                        {
+                            <td><a href="pool/@block.PoolName">@block.PoolName</a></td>
+                        }
                         <td class="mono" title="@block.Worker.FullName">@Display.Shorten(block.Worker.FullName)</td>
                         <td class="num">@Display.Percent(block.EffortPercent)</td>
                         <td class="num">@Display.Bitcoin(block.RewardSatoshis)</td>
@@ -52,4 +58,8 @@ else
 
     [Parameter, EditorRequired]
     public DateTimeOffset Now { get; set; }
+
+    /// <summary>Set to false where every block is from the same pool, so the column would only repeat itself.</summary>
+    [Parameter]
+    public bool ShowPool { get; set; } = true;
 }

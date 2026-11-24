@@ -4,6 +4,7 @@
 @inject IPoolOverview Overview
 @inject IStatisticsReader Statistics
 @inject IPoolHistoryRepository History
+@inject IBlockRepository BlockRepository
 @inject NavigationManager Navigation
 @inject IOptions<WebOptions> Options
 
@@ -81,12 +82,17 @@ else
             </div>
         }
     </SectionCard>
+
+    <SectionCard Icon="IconKind.Block" Title="Blocks found" Aside="@($"latest {Options.Value.RecentBlockCount}")" Flush="true">
+        <BlockTable Blocks="_blocks" Now="Now" ShowPool="false" />
+    </SectionCard>
 }
 
 @code {
     private PoolSnapshot? _pool;
     private IReadOnlyList<MinerSnapshot> _miners = [];
     private IReadOnlyList<PoolHistorySample> _history = [];
+    private IReadOnlyList<FoundBlock> _blocks = [];
     private string _address = string.Empty;
     private string? _searchError;
 
@@ -103,6 +109,7 @@ else
 
         _miners = Statistics.GetMiners(_pool.Name);
         _history = await History.GetSinceAsync(_pool.Name, Now.AddHours(-Options.Value.ChartHours), Cancellation);
+        _blocks = await BlockRepository.GetRecentForPoolAsync(_pool.Name, Options.Value.RecentBlockCount, Cancellation);
     }
 
     private void OpenMiner()

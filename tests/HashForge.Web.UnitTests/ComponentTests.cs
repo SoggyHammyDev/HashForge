@@ -796,4 +796,37 @@ public sealed class ComponentTests : WebTestContext
         Assert.DoesNotContain(hash, page.Find("h1").TextContent);
         Blocks.DidNotReceiveWithAnyArgs().FindAsync(default!, default);
     }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_PoolHasFoundBlocks_THEN_ListsThemWithoutAPoolColumn()
+    {
+        WebOptions.RecentBlockCount = 40;
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+        Blocks.GetRecentForPoolAsync("pplns", 40, Arg.Any<CancellationToken>()).Returns([Block()]);
+
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+
+        var blocks = pool.FindAll("section.card").Single(card => card.QuerySelector("h2")!.TextContent == "Blocks found");
+        Assert.Equal($"block/{BlockHash}", blocks.QuerySelector("tbody a")!.GetAttribute("href"));
+        Assert.DoesNotContain("Pool", blocks.QuerySelectorAll("th").Select(th => th.TextContent));
+        Assert.Contains("3.12500000 BTC", blocks.TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_PoolHasFoundNoBlocks_THEN_SaysSo()
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+
+        Assert.Contains("No blocks found yet", pool.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_BlockTable_WHEN_ShowPoolIsNotSet_THEN_PoolColumnIsShown()
+    {
+        var table = Render<BlockTable>(p => p.Add(t => t.Blocks, [Block()]).Add(t => t.Now, Now));
+
+        Assert.Contains("Pool", table.FindAll("th").Select(th => th.TextContent));
+    }
 }

@@ -23,6 +23,7 @@ public abstract class WebTestContext : BunitContext
     protected WebTestContext()
     {
         Blocks.GetRecentAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
+        Blocks.GetRecentForPoolAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
         History.GetSinceAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
         Overview.GetPools().Returns([]);
         Overview.GetTotals().Returns(new ShareTotals(0, 0));
