@@ -8,4 +8,7 @@ public interface IBlockRepository
     Task AddAsync(FoundBlock block, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<FoundBlock>> GetRecentAsync(int count, CancellationToken cancellationToken);
+
+    /// <summary>The block with this hash, or null when no pool here found it.</summary>
+    Task<FoundBlock?> FindAsync(string hash, CancellationToken cancellationToken);
 }

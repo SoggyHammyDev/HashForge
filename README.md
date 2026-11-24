@@ -58,6 +58,8 @@ Core node, Redis, PostgreSQL and the pool itself.
   sync state) refreshed by a background job every 30 seconds (`NETWORK_STATS_REFRESH_SECONDS`).
 - **Hashrate history charts** per pool and per miner (the last 24 hours on each miner's page), and a record of
   every block found with its payout split.
+- **A page for every block found**, listing what each address was paid (addresses are shortened) and linking
+  to the block on a public explorer for the network the node is on: mainnet, testnet4, testnet3 or signet.
 - **Shares are never written to a database.** They live in memory; per-miner totals are snapshotted to Redis
   every few seconds so a restart loses almost nothing.
 

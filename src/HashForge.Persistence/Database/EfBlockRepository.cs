@@ -36,6 +36,23 @@ public sealed class EfBlockRepository(IDbContextFactory<HashForgeDbContext> cont
         }
     }
 
+    public async Task<FoundBlock?> FindAsync(string hash, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(hash);
+
+        var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using (context.ConfigureAwait(false))
+        {
+            var entity = await context.Blocks
+                .AsNoTracking()
+                .Include(b => b.Payouts)
+                .OrderByDescending(b => b.Id)
+                .FirstOrDefaultAsync(b => b.Hash == hash, cancellationToken)
+                .ConfigureAwait(false);
+            return entity is null ? null : ToModel(entity);
+        }
+    }
+
     private static BlockEntity ToEntity(FoundBlock block) => new()
     {
         PoolName = block.PoolName,

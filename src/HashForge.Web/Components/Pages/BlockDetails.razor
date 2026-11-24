@@ -1,0 +1,103 @@
+@page "/block/{Hash}"
+@rendermode InteractiveServer
+@inherits RefreshingComponent
+@inject IBlockRepository BlockRepository
+@inject INetworkStatsStore NetworkStats
+
+<BrandTitle Page="Block" />
+
+@if (_block is null)
+{
+    <div class="page-head">
+        <a class="back-link" href="blocks">← All blocks</a>
+        <h1>Block not found</h1>
+        <p>@(_isValidHash ? "No pool here has found a block with that hash." : "The hash in this link is not a block hash.")</p>
+    </div>
+}
+else
+{
+    <div class="page-head">
+        <a class="back-link" href="blocks">← All blocks</a>
+        <h1>Block @Display.Count(_block.Height) <SchemeBadge Scheme="_block.Scheme" /></h1>
+        <p class="wrap mono">@_block.Hash</p>
+        @if (_explorer is not null)
+        {
+            <p><a class="explorer-link" href="@_explorer.BlockUri(_block.Hash)" target="_blank" rel="noopener noreferrer">View on @_explorer.Name ↗</a></p>
+        }
+    </div>
+
+    <div class="tiles">
+        <StatTile Icon="IconKind.Block" Label="Reward" Value="@Display.Bitcoin(_block.RewardSatoshis)" />
+        <StatTile Icon="IconKind.Miners" Label="Miners paid" Value="@Display.Count(_block.MinersPaid)" />
+        <StatTile Icon="IconKind.Hashrate" Label="Effort" Value="@Display.Percent(_block.EffortPercent)" />
+        <StatTile Icon="IconKind.Clock" Label="Found" Value="@Display.Age(_block.FoundAt, Now)" Hint="@_block.FoundAt.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)" />
+    </div>
+
+    <SectionCard Icon="IconKind.Block" Title="Details">
+        <dl class="facts">
+            <dt>Pool</dt>
+            <dd><a href="pool/@Uri.EscapeDataString(_block.PoolName)">@_block.PoolName</a></dd>
+            <dt>Found by</dt>
+            <dd class="mono">@Display.Shorten(_block.Worker.Address)</dd>
+            <dt>Status</dt>
+            <dd>
+                @if (_block.Accepted)
+                {
+                    <StatusPill Kind="StatusKind.Good" Text="Accepted" />
+                }
+                else
+                {
+                    <StatusPill Kind="StatusKind.Bad" Text="@($"Rejected: {_block.RejectReason}")" />
+                }
+            </dd>
+        </dl>
+    </SectionCard>
+
+    <SectionCard Icon="IconKind.Miners" Title="Payouts" Aside="@($"{_block.Payouts.Count} outputs")" Flush="true"
+                 Footnote="Paid directly by the block itself. Addresses are shortened here; the full list is in the block on the explorer.">
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>Paid for</th>
+                        <th class="num">Amount</th>
+                        <th class="num">Share of reward</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var index = 0; index < _block.Payouts.Count; index++)
+                    {
+                        var payout = _block.Payouts[index];
+                        <tr>
+                            <td class="mono">@Display.Shorten(payout.Address)</td>
+                            <td>@(_block.IsPoolFee(index) ? "Pool fee" : "Mining")</td>
+                            <td class="num">@Display.Bitcoin(payout.Satoshis)</td>
+                            <td class="num">@Display.Percent(ShareOfReward(payout.Satoshis))</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </SectionCard>
+}
+
+@code {
+    private FoundBlock? _block;
+    private BlockExplorer? _explorer;
+    private bool _isValidHash;
+
+    [Parameter]
+    public string Hash { get; set; } = string.Empty;
+
+    protected override async Task LoadAsync()
+    {
+        // The hash comes straight from the URL, so it is checked before being looked up.
+        _isValidHash = BlockHashFormat.IsValid(Hash);
+        _block = _isValidHash ? await BlockRepository.FindAsync(Hash, Cancellation) : null;
+        _explorer = BlockExplorers.ForChain(NetworkStats.Current?.Chain);
+    }
+
+    private double ShareOfReward(long satoshis) =>
+        _block is { RewardSatoshis: > 0 } ? 100.0 * satoshis / _block.RewardSatoshis : 0;
+}

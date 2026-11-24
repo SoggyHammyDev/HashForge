@@ -18,4 +18,10 @@ public sealed record FoundBlock(
 {
     /// <summary>How many miners the block paid, not counting the pool's fee output.</summary>
     public int MinersPaid { get; init; }
+
+    /// <summary>
+    /// Whether the payout at this position is the pool's fee rather than a miner's earnings. The fee, when
+    /// there is one, is always the last output and is the only one not counted in <see cref="MinersPaid"/>.
+    /// </summary>
+    public bool IsPoolFee(int payoutIndex) => Payouts.Count == MinersPaid + 1 && payoutIndex == Payouts.Count - 1;
 }

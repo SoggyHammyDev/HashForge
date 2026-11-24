@@ -22,7 +22,7 @@ else
                 @foreach (var block in Blocks)
                 {
                     <tr>
-                        <td class="mono" title="@block.Hash">@block.Height</td>
+                        <td class="mono"><a href="block/@block.Hash" title="@block.Hash">@block.Height</a></td>
                         <td><a href="pool/@block.PoolName">@block.PoolName</a></td>
                         <td class="mono" title="@block.Worker.FullName">@Display.Shorten(block.Worker.FullName)</td>
                         <td class="num">@Display.Percent(block.EffortPercent)</td>

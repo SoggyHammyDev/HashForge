@@ -181,4 +181,27 @@ public sealed class DatabaseTests : IDisposable
         Assert.Contains("InitialCreate", context.Database.GetMigrations().First());
         Assert.Equal(3, context.Database.GetMigrations().Count());
     }
+
+    [Fact]
+    public async Task GIVEN_FindAsync_WHEN_BlockWithThatHashIsStored_THEN_ReturnsItWithItsPayouts()
+    {
+        var repository = new EfBlockRepository(_factory);
+        await repository.AddAsync(Block(1, Now), CancellationToken.None);
+        await repository.AddAsync(Block(2, Now.AddHours(1)), CancellationToken.None);
+
+        var found = await repository.FindAsync("hash-2", CancellationToken.None);
+
+        Assert.NotNull(found);
+        Assert.Equal(2, found.Height);
+        Assert.Equal([200_000_000, 112_500_000], found.Payouts.Select(p => p.Satoshis));
+    }
+
+    [Fact]
+    public async Task GIVEN_FindAsync_WHEN_NoBlockHasThatHash_THEN_ReturnsNull()
+    {
+        var repository = new EfBlockRepository(_factory);
+        await repository.AddAsync(Block(1, Now), CancellationToken.None);
+
+        Assert.Null(await repository.FindAsync("hash-9", CancellationToken.None));
+    }
 }

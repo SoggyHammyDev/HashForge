@@ -5,6 +5,7 @@ using HashForge.Domain.Formatting;
 using HashForge.Mining.History;
 using HashForge.Mining.Jobs;
 using HashForge.Mining.Pools;
+using HashForge.Mining.Shares;
 using HashForge.Mining.Statistics;
 using HashForge.Stratum.Sessions;
 using HashForge.Web.Components.Layout;
@@ -694,4 +695,105 @@ public sealed class ComponentTests : WebTestContext
         Render<Miner>(p => p.Add(x => x.PoolName, "pplns").Add(x => x.Address, "<script>"));
 
         MinerHistory.DidNotReceiveWithAnyArgs().Get(default!, default!);
-    }}
+    }
+
+    private static readonly string BlockHash = new('a', 64);
+
+    private static FoundBlock PaidBlock() => Block() with
+    {
+        RewardSatoshis = 5_000_000_000,
+        Payouts =
+        [
+            new PayoutEntry("tb1qdlavq4cg7j0mnfsqtvv4mpkgu8mheclkpqc0n5", 4_950_000_000),
+            new PayoutEntry("tb1qep7zndam7d6ucy4w9egy6wg2z5fm43qthy42p9", 50_000_000),
+        ],
+        MinersPaid = 1,
+    };
+
+    [Fact]
+    public void GIVEN_BlockTable_WHEN_BlocksGiven_THEN_HeightLinksToTheBlockPage()
+    {
+        var table = Render<BlockTable>(p => p.Add(t => t.Blocks, [Block()]).Add(t => t.Now, Now));
+
+        Assert.Equal($"block/{BlockHash}", table.Find("tbody tr td a").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void GIVEN_BlockDetails_WHEN_BlockExists_THEN_ShowsEachPayoutAmountAndMarksThePoolFee()
+    {
+        Blocks.FindAsync(BlockHash, Arg.Any<CancellationToken>()).Returns(PaidBlock());
+
+        var page = Render<BlockDetails>(p => p.Add(x => x.Hash, BlockHash));
+
+        var rows = page.FindAll("tbody tr");
+        Assert.Equal(2, rows.Count);
+        Assert.Contains("49.50000000 BTC", rows[0].TextContent);
+        Assert.Contains("Mining", rows[0].TextContent);
+        Assert.Contains("99%", rows[0].TextContent);
+        Assert.Contains("0.50000000 BTC", rows[1].TextContent);
+        Assert.Contains("Pool fee", rows[1].TextContent);
+        Assert.Contains("Block 850,001", page.Find("h1").TextContent);
+    }
+
+    [Fact]
+    public void GIVEN_BlockDetails_WHEN_BlockExists_THEN_FullAddressesAppearNowhereInThePage()
+    {
+        Blocks.FindAsync(BlockHash, Arg.Any<CancellationToken>()).Returns(PaidBlock());
+
+        var page = Render<BlockDetails>(p => p.Add(x => x.Hash, BlockHash));
+
+        Assert.Contains("tb1qdlavq4…pqc0n5", page.Markup);
+        Assert.DoesNotContain("tb1qdlavq4cg7j0mnfsqtvv4mpkgu8mheclkpqc0n5", page.Markup);
+        Assert.DoesNotContain("tb1qep7zndam7d6ucy4w9egy6wg2z5fm43qthy42p9", page.Markup);
+        Assert.DoesNotContain("bc1qalicealicealicealice", page.Markup);
+    }
+
+    [Theory]
+    [InlineData("main", "View on mempool.space ↗", "https://mempool.space/block/")]
+    [InlineData("testnet4", "View on mempool.space (testnet4) ↗", "https://mempool.space/testnet4/block/")]
+    public void GIVEN_BlockDetails_WHEN_NodeIsOnAPublicNetwork_THEN_LinksToThatNetworksExplorer(string chain, string expectedText, string expectedPrefix)
+    {
+        Blocks.FindAsync(BlockHash, Arg.Any<CancellationToken>()).Returns(PaidBlock());
+        NetworkStats.Current.Returns(Network() with { Chain = chain });
+
+        var link = Render<BlockDetails>(p => p.Add(x => x.Hash, BlockHash)).Find("a.explorer-link");
+
+        Assert.Equal(expectedText, link.TextContent);
+        Assert.Equal(expectedPrefix + BlockHash, link.GetAttribute("href"));
+        Assert.Equal("noopener noreferrer", link.GetAttribute("rel"));
+    }
+
+    [Theory]
+    [InlineData("regtest")]
+    [InlineData(null)]
+    public void GIVEN_BlockDetails_WHEN_NetworkHasNoPublicExplorer_THEN_NoExplorerLinkIsShown(string? chain)
+    {
+        Blocks.FindAsync(BlockHash, Arg.Any<CancellationToken>()).Returns(PaidBlock());
+        NetworkStats.Current.Returns(chain is null ? null : Network() with { Chain = chain });
+
+        var page = Render<BlockDetails>(p => p.Add(x => x.Hash, BlockHash));
+
+        Assert.Empty(page.FindAll("a.explorer-link"));
+    }
+
+    [Fact]
+    public void GIVEN_BlockDetails_WHEN_NoBlockHasThatHash_THEN_ShowsNotFound()
+    {
+        var page = Render<BlockDetails>(p => p.Add(x => x.Hash, BlockHash));
+
+        Assert.Contains("Block not found", page.Find("h1").TextContent);
+        Assert.Contains("No pool here has found a block with that hash", page.Markup);
+    }
+
+    [Theory]
+    [InlineData("<script>")]
+    [InlineData("00ab")]
+    public void GIVEN_BlockDetails_WHEN_HashInUrlIsNotABlockHash_THEN_ItIsNeitherLookedUpNorDisplayed(string hash)
+    {
+        var page = Render<BlockDetails>(p => p.Add(x => x.Hash, hash));
+
+        Assert.Contains("not a block hash", page.Markup);
+        Assert.DoesNotContain(hash, page.Find("h1").TextContent);
+        Blocks.DidNotReceiveWithAnyArgs().FindAsync(default!, default);
+    }
+}
