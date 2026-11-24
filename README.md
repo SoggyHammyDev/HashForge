@@ -54,7 +54,7 @@ Core node, Redis, PostgreSQL and the pool itself.
 - **Effort:** work submitted so far as a percentage of the work a block needs on average.
 - **Best share** per worker, per miner, per pool and overall, always with the worker that found it.
 - **Network statistics** (height, difficulty, network hashrate, current block reward, time of the last block,
-  sync state) refreshed by a background job.
+  sync state) refreshed by a background job every 30 seconds (`NETWORK_STATS_REFRESH_SECONDS`).
 - **Hashrate history chart** per pool and a record of every block found with its payout split.
 - **Shares are never written to a database.** They live in memory; per-miner totals are snapshotted to Redis
   every few seconds so a restart loses almost nothing.
