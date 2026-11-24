@@ -3,6 +3,11 @@
     <ProjectReference Include="..\..\src\HashForge.Web\HashForge.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The stylesheets are checked as text, so they are copied next to the tests. -->
+    <None Include="..\..\src\HashForge.Web\wwwroot\app.css" Link="Styles\app.css" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\HashForge.Web\Components\Layout\ReconnectModal.razor.css" Link="Styles\ReconnectModal.razor.css" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="bunit" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
   </ItemGroup>
