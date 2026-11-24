@@ -29,6 +29,8 @@
     margin: 20vh auto;
     padding: 2rem;
     border: 1px solid var(--border-strong);
+    /* The dialog takes focus while it has no button to show, and a focus ring round the whole box reads as an error. */
+    outline: none;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     opacity: 0;

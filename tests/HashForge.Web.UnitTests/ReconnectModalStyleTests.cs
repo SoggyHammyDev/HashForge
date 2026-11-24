@@ -44,6 +44,12 @@ public sealed partial class ReconnectModalStyleTests
     }
 
     [Fact]
+    public void GIVEN_ReconnectModal_WHEN_Styled_THEN_DialogItselfShowsNoFocusRing()
+    {
+        Assert.Contains("    outline: none;", Rule("#components-reconnect-modal"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GIVEN_ReconnectModal_WHEN_Styled_THEN_ButtonsKeepTheSiteWideButtonStyle()
     {
         Assert.DoesNotContain("#components-reconnect-modal button", Modal, StringComparison.Ordinal);
