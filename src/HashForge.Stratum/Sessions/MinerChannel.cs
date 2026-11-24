@@ -21,19 +21,34 @@ public sealed class MinerChannel(IStratumConnection connection, TimeSpan sendTim
     /// Sends the message that <paramref name="compose"/> produces once this sender holds the wire, or nothing
     /// when it returns null. Deciding under the lock is what lets callers keep messages in a strict order.
     /// </summary>
-    public async Task SendAsync(Func<string?> compose, CancellationToken cancellationToken)
+    public Task SendAsync(Func<string?> compose, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(compose);
+        return WriteInTurnAsync(
+            token => compose() is { } message ? connection.WriteLineAsync(message, token) : Task.CompletedTask,
+            cancellationToken);
+    }
 
+    /// <summary>
+    /// As <see cref="SendAsync(Func{string?}, CancellationToken)"/>, for a line that is already encoded and may be
+    /// shared with other miners.
+    /// </summary>
+    public Task SendEncodedAsync(Func<ReadOnlyMemory<byte>?> compose, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compose);
+        return WriteInTurnAsync(
+            token => compose() is { } line ? connection.WriteAsync(line, token) : Task.CompletedTask,
+            cancellationToken);
+    }
+
+    private async Task WriteInTurnAsync(Func<CancellationToken, Task> write, CancellationToken cancellationToken)
+    {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(sendTimeout);
         await _writeLock.WaitAsync(timeout.Token).ConfigureAwait(false);
         try
         {
-            if (compose() is { } message)
-            {
-                await connection.WriteLineAsync(message, timeout.Token).ConfigureAwait(false);
-            }
+            await write(timeout.Token).ConfigureAwait(false);
         }
         finally
         {

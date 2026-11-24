@@ -112,4 +112,34 @@ public sealed class JobDeliveryTests
         Assert.Equal(sequences.Order(), sequences);
         Assert.Equal(200, sequences[^1]);
     }
+
+    [Fact]
+    public async Task GIVEN_SendAsync_WHEN_SameJobGoesToTwoMiners_THEN_BothAreSentTheVerySameEncodedLine()
+    {
+        var otherConnection = new FakeConnection();
+        var otherDelivery = new JobDelivery(new MinerChannel(otherConnection, TimeSpan.FromSeconds(30)));
+        var job = Job("1", 1, TipA);
+
+        await _delivery.SendAsync(job, CancellationToken.None);
+        await otherDelivery.SendAsync(job, CancellationToken.None);
+
+        // Equal memory means the same array, not a copy: the line was built once for both.
+        Assert.Equal(Assert.Single(_connection.EncodedLines), Assert.Single(otherConnection.EncodedLines));
+    }
+
+    [Fact]
+    public async Task GIVEN_SendAsync_WHEN_OneMinerHasSeenTheTipAndAnotherHasNot_THEN_EachGetsTheRightCleanFlag()
+    {
+        var newcomer = new FakeConnection();
+        var newcomerDelivery = new JobDelivery(new MinerChannel(newcomer, TimeSpan.FromSeconds(30)));
+        await _delivery.SendAsync(Job("1", 1, TipA), CancellationToken.None);
+        var refreshed = Job("2", 2, TipA);
+
+        await _delivery.SendAsync(refreshed, CancellationToken.None);
+        await newcomerDelivery.SendAsync(refreshed, CancellationToken.None);
+
+        Assert.Equal([("1", true), ("2", false)], Sent());
+        using var document = JsonDocument.Parse(Assert.Single(newcomer.Sent));
+        Assert.True(document.RootElement.GetProperty("params")[8].GetBoolean());
+    }
 }

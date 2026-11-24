@@ -198,4 +198,40 @@ public sealed class SessionTests
         Assert.Contains("mining.set_difficulty", _connection.Sent[0]);
         Assert.Contains("mining.notify", _connection.Sent[1]);
     }
+
+    [Fact]
+    public void GIVEN_SessionRegistry_WHEN_Counting_THEN_GivesTotalAndPerAddressNumbers()
+    {
+        var registry = new SessionRegistry();
+        var home = System.Net.IPAddress.Parse("10.0.0.1");
+        registry.Add(StratumTestKit.Session(new FakeConnection { RemoteAddress = home }, extranonce1: [0, 0, 0, 1]));
+        registry.Add(StratumTestKit.Session(new FakeConnection { RemoteAddress = home }, extranonce1: [0, 0, 0, 2]));
+        registry.Add(StratumTestKit.Session(new FakeConnection { RemoteAddress = System.Net.IPAddress.Parse("10.0.0.2") }, extranonce1: [0, 0, 0, 3]));
+
+        Assert.Equal(3, registry.Count);
+        Assert.Equal(2, registry.CountFrom(home));
+        Assert.Equal(0, registry.CountFrom(System.Net.IPAddress.Parse("10.0.0.9")));
+    }
+
+    [Fact]
+    public async Task GIVEN_SendEncodedAsync_WHEN_MinerStopsReading_THEN_SendIsAbandonedAfterTimeout()
+    {
+        var stalled = Substitute.For<HashForge.Stratum.Transport.IStratumConnection>();
+        stalled.WriteAsync(Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>())
+            .Returns(call => Task.Delay(Timeout.Infinite, call.Arg<CancellationToken>()));
+        var channel = new MinerChannel(stalled, TimeSpan.FromMilliseconds(50));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => channel.SendEncodedAsync(() => new byte[] { 1 }, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GIVEN_SendEncodedAsync_WHEN_ThereIsNothingToSend_THEN_NothingIsWritten()
+    {
+        var channel = new MinerChannel(_connection, TimeSpan.FromSeconds(30));
+
+        await channel.SendEncodedAsync(() => null, CancellationToken.None);
+
+        Assert.Empty(_connection.Sent);
+    }
 }

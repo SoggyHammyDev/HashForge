@@ -28,6 +28,9 @@ public sealed class TcpStratumConnection : IStratumConnection
     public async Task WriteLineAsync(string line, CancellationToken cancellationToken) =>
         await _stream.WriteAsync(Encoding.UTF8.GetBytes(line + '\n'), cancellationToken).ConfigureAwait(false);
 
+    public async Task WriteAsync(ReadOnlyMemory<byte> encodedLine, CancellationToken cancellationToken) =>
+        await _stream.WriteAsync(encodedLine, cancellationToken).ConfigureAwait(false);
+
     public async ValueTask DisposeAsync()
     {
         await _stream.DisposeAsync().ConfigureAwait(false);

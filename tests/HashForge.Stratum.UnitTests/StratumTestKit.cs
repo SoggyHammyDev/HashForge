@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using HashForge.Domain;
@@ -15,6 +16,9 @@ internal sealed class FakeConnection : IStratumConnection
     private readonly Channel<string?> _incoming = Channel.CreateUnbounded<string?>();
 
     public List<string> Sent { get; } = [];
+
+    /// <summary>The lines that arrived already encoded, as the exact memory they were sent from.</summary>
+    public List<ReadOnlyMemory<byte>> EncodedLines { get; } = [];
 
     public bool Disposed { get; private set; }
 
@@ -41,6 +45,12 @@ internal sealed class FakeConnection : IStratumConnection
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task WriteAsync(ReadOnlyMemory<byte> encodedLine, CancellationToken cancellationToken)
+    {
+        EncodedLines.Add(encodedLine);
+        return WriteLineAsync(Encoding.UTF8.GetString(encodedLine.Span).TrimEnd('\n'), cancellationToken);
     }
 
     public ValueTask DisposeAsync()

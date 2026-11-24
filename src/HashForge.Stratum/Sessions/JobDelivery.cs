@@ -24,11 +24,11 @@ public sealed class JobDelivery(MinerChannel channel)
     public Task SendAsync(MiningJob job, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(job);
-        return channel.SendAsync(() => Compose(job), cancellationToken);
+        return channel.SendEncodedAsync(() => Compose(job), cancellationToken);
     }
 
     /// <summary>Runs under the channel's write lock, so no other job can be sent between the check and the write.</summary>
-    private string? Compose(MiningJob job)
+    private ReadOnlyMemory<byte>? Compose(MiningJob job)
     {
         if (job.TemplateSequence < _lastSequence)
         {
@@ -45,6 +45,6 @@ public sealed class JobDelivery(MinerChannel channel)
         _sentJobIds[job.Id] = true;
         _lastSequence = job.TemplateSequence;
         _lastPreviousBlockHash = job.Template.PreviousBlockHash;
-        return JobNotification.Notify(job, cleanJobs);
+        return JobNotification.NotifyLine(job, cleanJobs);
     }
 }

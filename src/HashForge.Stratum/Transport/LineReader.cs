@@ -7,7 +7,13 @@ public sealed class LineReader(Stream stream, int maxLineLength)
 {
     private const byte LineFeed = (byte)'\n';
 
-    private readonly byte[] _buffer = new byte[maxLineLength];
+    /// <summary>
+    /// Enough for any ordinary Stratum message. Every connection holds one buffer for as long as it lasts,
+    /// so starting at the size limit would cost thousands of idle miners that much memory each.
+    /// </summary>
+    public const int InitialBufferSize = 512;
+
+    private byte[] _buffer = new byte[Math.Min(InitialBufferSize, maxLineLength)];
     private int _start;
     private int _end;
 
@@ -26,7 +32,12 @@ public sealed class LineReader(Stream stream, int maxLineLength)
             Compact();
             if (_end == _buffer.Length)
             {
-                throw new InvalidDataException($"Line exceeds the {maxLineLength} byte limit.");
+                if (_buffer.Length >= maxLineLength)
+                {
+                    throw new InvalidDataException($"Line exceeds the {maxLineLength} byte limit.");
+                }
+
+                Array.Resize(ref _buffer, (int)Math.Min((long)_buffer.Length * 2, maxLineLength));
             }
 
             var read = await stream.ReadAsync(_buffer.AsMemory(_end), cancellationToken).ConfigureAwait(false);

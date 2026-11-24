@@ -171,4 +171,34 @@ public sealed class ProtocolTests
         Assert.Equal([21, "Job not found", null], StratumError.JobNotFound.ToWire());
         Assert.Equal(PayoutScheme.Solo, StratumTestKit.Pool().Scheme);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GIVEN_NotifyLine_WHEN_Encoded_THEN_ItIsTheNotificationFollowedByALineEnding(bool cleanJobs)
+    {
+        var job = HandlerTestData.Job(StratumTestKit.Pool());
+
+        var line = System.Text.Encoding.UTF8.GetString(JobNotification.NotifyLine(job, cleanJobs).Span);
+
+        Assert.Equal(JobNotification.Notify(job, cleanJobs) + "\n", line);
+    }
+
+    [Fact]
+    public void GIVEN_NotifyLine_WHEN_AskedAgainForTheSameJob_THEN_ReturnsTheSameBytesWithoutEncodingAgain()
+    {
+        var job = HandlerTestData.Job(StratumTestKit.Pool());
+
+        Assert.Equal(JobNotification.NotifyLine(job, cleanJobs: true), JobNotification.NotifyLine(job, cleanJobs: true));
+        Assert.NotEqual(JobNotification.NotifyLine(job, cleanJobs: true), JobNotification.NotifyLine(job, cleanJobs: false));
+    }
+
+    [Fact]
+    public void GIVEN_NotifyLine_WHEN_JobsDiffer_THEN_EachHasItsOwnLine()
+    {
+        var first = HandlerTestData.Job(StratumTestKit.Pool(), id: "a1");
+        var second = HandlerTestData.Job(StratumTestKit.Pool(), id: "a2");
+
+        Assert.NotEqual(JobNotification.NotifyLine(first, cleanJobs: true).ToArray(), JobNotification.NotifyLine(second, cleanJobs: true).ToArray());
+    }
 }

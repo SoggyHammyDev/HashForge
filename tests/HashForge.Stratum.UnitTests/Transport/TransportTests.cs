@@ -98,4 +98,49 @@ public sealed class TransportTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => accepting.WaitAsync(Timeout));
     }
+
+    [Fact]
+    public async Task GIVEN_ReadLineAsync_WHEN_LineIsLongerThanTheInitialBuffer_THEN_BufferGrowsAndLineIsReadWhole()
+    {
+        var longLine = new string('x', LineReader.InitialBufferSize * 5);
+        var reader = Reader($"short\n{longLine}\nafter\n", maxLineLength: LineReader.InitialBufferSize * 8, chunkSize: 100);
+
+        Assert.Equal("short", await reader.ReadLineAsync(CancellationToken.None));
+        Assert.Equal(longLine, await reader.ReadLineAsync(CancellationToken.None));
+        Assert.Equal("after", await reader.ReadLineAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GIVEN_ReadLineAsync_WHEN_LineIsExactlyAtTheLimit_THEN_ItIsStillAccepted()
+    {
+        const int limit = LineReader.InitialBufferSize * 3;
+        var line = new string('x', limit - 1);
+        var reader = Reader($"{line}\n", maxLineLength: limit);
+
+        Assert.Equal(line, await reader.ReadLineAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GIVEN_ReadLineAsync_WHEN_LineOutgrowsALimitAboveTheInitialBuffer_THEN_ThrowsInvalidData()
+    {
+        const int limit = LineReader.InitialBufferSize * 3;
+        var reader = Reader(new string('x', limit + 1) + "\n", maxLineLength: limit);
+
+        await Assert.ThrowsAsync<InvalidDataException>(async () => await reader.ReadLineAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GIVEN_WriteAsync_WHEN_GivenAnEncodedLine_THEN_MinerReceivesExactlyThoseBytes()
+    {
+        var factory = new TcpConnectionListenerFactory(StratumTestKit.Options());
+        await using var listener = factory.Create(port: 0);
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, listener.Port).WaitAsync(Timeout);
+        await using var connection = await listener.AcceptAsync(CancellationToken.None).WaitAsync(Timeout);
+        using var clientReader = new StreamReader(client.GetStream());
+
+        await connection.WriteAsync("already encoded\n"u8.ToArray(), CancellationToken.None);
+
+        Assert.Equal("already encoded", await clientReader.ReadLineAsync().WaitAsync(Timeout));
+    }
 }

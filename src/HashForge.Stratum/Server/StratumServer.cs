@@ -125,10 +125,9 @@ public sealed partial class StratumServer(
     /// <summary>Applies the connection limits before any per-miner state is created.</summary>
     private bool IsOverLimit(IStratumConnection connection)
     {
-        var current = sessions.Sessions;
         var perAddress = options.Value.MaxConnectionsPerAddress;
-        return current.Count >= options.Value.MaxConnections
-            || (perAddress > 0 && current.Count(s => s.RemoteAddress.Equals(connection.RemoteAddress)) >= perAddress);
+        return sessions.Count >= options.Value.MaxConnections
+            || (perAddress > 0 && sessions.CountFrom(connection.RemoteAddress) >= perAddress);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Accepting a connection on pool {Pool} failed; still listening")]
