@@ -41,14 +41,71 @@ public sealed class JobTests
     }
 
     [Fact]
-    public void GIVEN_TryRegisterSubmission_WHEN_SameKeySubmittedTwice_THEN_SecondIsRefusedIgnoringCase()
+    public void GIVEN_TryRegisterSubmission_WHEN_SameHashSubmittedTwice_THEN_SecondIsRefused()
+    {
+        var job = TestData.Job();
+        var hash = Hash(1);
+
+        Assert.True(job.TryRegisterSubmission(hash));
+        Assert.False(job.TryRegisterSubmission(hash));
+        Assert.False(job.TryRegisterSubmission((byte[])hash.Clone()));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(16)]
+    [InlineData(24)]
+    [InlineData(31)]
+    public void GIVEN_TryRegisterSubmission_WHEN_HashesDifferInAnySingleByte_THEN_BothAreAccepted(int position)
+    {
+        var job = TestData.Job();
+        var other = Hash(1);
+        other[position] ^= 0x80;
+
+        Assert.True(job.TryRegisterSubmission(Hash(1)));
+        Assert.True(job.TryRegisterSubmission(other));
+    }
+
+    [Fact]
+    public void GIVEN_TryRegisterSubmission_WHEN_ManySharesArriveAtOnce_THEN_EachHashIsAcceptedExactlyOnce()
+    {
+        var job = TestData.Job();
+        var accepted = 0;
+
+        // Every hash is offered four times from different threads; only one offer of each may succeed.
+        Parallel.For(0, 40_000, i =>
+        {
+            if (job.TryRegisterSubmission(Hash(i / 4)))
+            {
+                Interlocked.Increment(ref accepted);
+            }
+        });
+
+        Assert.Equal(10_000, accepted);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(31)]
+    [InlineData(33)]
+    public void GIVEN_TryRegisterSubmission_WHEN_HashIsNotThirtyTwoBytes_THEN_Throws(int length)
     {
         var job = TestData.Job();
 
-        Assert.True(job.TryRegisterSubmission("AB:01"));
-        Assert.False(job.TryRegisterSubmission("ab:01"));
-        Assert.True(job.TryRegisterSubmission("ab:02"));
+        Assert.Throws<ArgumentException>(() => job.TryRegisterSubmission(new byte[length]));
     }
+
+    [Fact]
+    public void GIVEN_SubmissionKey_WHEN_BuiltFromTheSameHash_THEN_KeysAreEqual()
+    {
+        Assert.Equal(SubmissionKey.FromHash(Hash(5)), SubmissionKey.FromHash(Hash(5)));
+        Assert.NotEqual(SubmissionKey.FromHash(Hash(5)), SubmissionKey.FromHash(Hash(6)));
+    }
+
+    /// <summary>A distinct, repeatable 32-byte hash for each seed.</summary>
+    private static byte[] Hash(int seed) => System.Security.Cryptography.SHA256.HashData(BitConverter.GetBytes(seed));
 
     [Fact]
     public async Task GIVEN_CreateAsync_WHEN_PoolHasFee_THEN_CoinbasePaysMinerAndFeeAddress()

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Numerics;
 using HashForge.Bitcoin.Primitives;
 using HashForge.Bitcoin.Rpc;
@@ -9,7 +8,10 @@ namespace HashForge.Mining.Jobs;
 /// <summary>One unit of work handed to miners: a block template plus the coinbase that pays this pool's miners.</summary>
 public sealed class MiningJob
 {
-    private readonly ConcurrentDictionary<string, byte> _submissions = new(StringComparer.OrdinalIgnoreCase);
+    // A plain set behind a lock keeps each entry to the size of the hash itself; a concurrent dictionary
+    // would add an object per share, and there can be more than a million of them before the next block.
+    private readonly Lock _submissionsGate = new();
+    private readonly HashSet<SubmissionKey> _submissions = [];
 
     public MiningJob(
         string id,
@@ -64,6 +66,15 @@ public sealed class MiningJob
 
     public IReadOnlyList<byte[]> MerkleBranch { get; }
 
-    /// <summary>Records a submission and returns false when the same one was already seen.</summary>
-    public bool TryRegisterSubmission(string submissionKey) => _submissions.TryAdd(submissionKey, 0);
+    /// <summary>
+    /// Records a share by its block header hash and returns false when the same one was already seen.
+    /// </summary>
+    public bool TryRegisterSubmission(ReadOnlySpan<byte> headerHash)
+    {
+        var key = SubmissionKey.FromHash(headerHash);
+        lock (_submissionsGate)
+        {
+            return _submissions.Add(key);
+        }
+    }
 }

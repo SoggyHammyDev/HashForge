@@ -41,8 +41,7 @@ public sealed class ShareValidator : IShareValidator
 
         // Duplicates are recognised by the header hash, so the same work cannot be credited twice by
         // spelling a field differently. Only valid work is remembered, so junk cannot fill the memory.
-        var hashHex = HashHex.ToDisplayHex(hash);
-        if (!job.TryRegisterSubmission(hashHex))
+        if (!job.TryRegisterSubmission(hash))
         {
             return ShareValidation.Rejected(ShareOutcome.Duplicate, actualDifficulty);
         }
@@ -51,7 +50,7 @@ public sealed class ShareValidator : IShareValidator
             ShareOutcome.Accepted,
             credited.Value,
             actualDifficulty,
-            isBlock ? new BlockCandidate(hashHex, SerializeBlock(job, header, fields.Extranonce)) : null);
+            isBlock ? new BlockCandidate(HashHex.ToDisplayHex(hash), SerializeBlock(job, header, fields.Extranonce)) : null);
     }
 
     private static string SerializeBlock(MiningJob job, byte[] header, byte[] extranonce) =>
