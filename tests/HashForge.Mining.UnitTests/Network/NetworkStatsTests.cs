@@ -60,4 +60,67 @@ public sealed class NetworkStatsTests
         Assert.Equal(TimeSpan.FromSeconds(45), job.Interval);
         Assert.Equal("network-stats", job.Name);
     }
+
+    private static ChainInfo Tip(string hash, long time) => new()
+    {
+        Chain = "testnet4", Blocks = 10, Headers = 10, BestBlockHash = hash, Difficulty = 1, Time = time,
+    };
+
+    private static (NetworkStatsJob Job, NetworkStatsStore Store, IChainInfoSource Source, FakeTimeProvider Time) Rig()
+    {
+        var source = Substitute.For<IChainInfoSource>();
+        var store = new NetworkStatsStore();
+        var time = new FakeTimeProvider(TestData.Now);
+        return (new NetworkStatsJob(source, store, time, TestData.Options()), store, source, time);
+    }
+
+    [Fact]
+    public async Task GIVEN_ExecuteAsync_WHEN_FirstTipIsStampedInTheFuture_THEN_LastBlockIsNeverLaterThanNow()
+    {
+        var (job, store, source, _) = Rig();
+        source.GetChainInfoAsync(Arg.Any<CancellationToken>()).Returns(Tip("aa", TestData.Now.AddHours(2).ToUnixTimeSeconds()));
+
+        await job.ExecuteAsync(CancellationToken.None);
+
+        Assert.Equal(TestData.Now, store.Current!.LastBlockAt);
+    }
+
+    [Fact]
+    public async Task GIVEN_ExecuteAsync_WHEN_NewBlockArrivesWhileWatching_THEN_ItIsDatedByWhenItWasSeen()
+    {
+        var (job, store, source, time) = Rig();
+        source.GetChainInfoAsync(Arg.Any<CancellationToken>()).Returns(Tip("aa", TestData.Now.AddHours(-1).ToUnixTimeSeconds()));
+        await job.ExecuteAsync(CancellationToken.None);
+        time.Advance(TimeSpan.FromMinutes(5));
+        source.GetChainInfoAsync(Arg.Any<CancellationToken>()).Returns(Tip("bb", TestData.Now.AddHours(2).ToUnixTimeSeconds()));
+
+        await job.ExecuteAsync(CancellationToken.None);
+
+        Assert.Equal(TestData.Now.AddMinutes(5), store.Current!.LastBlockAt);
+    }
+
+    [Fact]
+    public async Task GIVEN_ExecuteAsync_WHEN_TipIsUnchanged_THEN_LastBlockTimeIsKeptSoItsAgeGrows()
+    {
+        var (job, store, source, time) = Rig();
+        source.GetChainInfoAsync(Arg.Any<CancellationToken>()).Returns(Tip("aa", TestData.Now.AddHours(2).ToUnixTimeSeconds()));
+        await job.ExecuteAsync(CancellationToken.None);
+        time.Advance(TimeSpan.FromMinutes(5));
+
+        await job.ExecuteAsync(CancellationToken.None);
+
+        Assert.Equal(TestData.Now, store.Current!.LastBlockAt);
+        Assert.Equal(TestData.Now.AddMinutes(5), store.Current.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task GIVEN_ExecuteAsync_WHEN_NodeReportsNoBlockTime_THEN_LastBlockIsUnknown()
+    {
+        var (job, store, source, _) = Rig();
+        source.GetChainInfoAsync(Arg.Any<CancellationToken>()).Returns(Tip("aa", 0));
+
+        await job.ExecuteAsync(CancellationToken.None);
+
+        Assert.Null(store.Current!.LastBlockAt);
+    }
 }
