@@ -62,6 +62,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IStatePersistable, PayoutState>();
 
         services.AddSingleton<INodeReadiness, NodeReadiness>();
+        services.AddSingleton<INetworkDifficulty, NetworkDifficulty>();
         services.AddSingleton<ITemplateRefresher, TemplateRefresher>();
         services.AddSingleton<IPeriodicJob, ChainTipPoller>();
         services.AddSingleton<IPeriodicJob, NetworkStatsJob>();

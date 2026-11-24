@@ -3,6 +3,7 @@ using HashForge.Bitcoin.Rpc;
 using HashForge.Mining.History;
 using HashForge.Mining.Hosting;
 using HashForge.Mining.Jobs;
+using HashForge.Mining.Network;
 using HashForge.Mining.Notifications;
 using HashForge.Mining.Payouts;
 using HashForge.Mining.Pools;
@@ -81,6 +82,7 @@ public sealed class ServiceCollectionExtensionsTests
         Assert.Equal([notifier], provider.GetServices<IBestShareListener>());
         Assert.Equal(["statistics", "payouts"], provider.GetServices<IStatePersistable>().Select(s => s.StateKey));
         Assert.IsType<StatisticsReader>(provider.GetRequiredService<IStatisticsReader>());
+        Assert.IsType<NetworkDifficulty>(provider.GetRequiredService<INetworkDifficulty>());
         Assert.IsType<PayoutPlanSource>(provider.GetRequiredService<IPayoutPlanSource>());
         Assert.Same(provider.GetRequiredService<IStatisticsStore>(), provider.GetRequiredService<IStatisticsStore>());
         Assert.Same(provider.GetRequiredService<IPayoutSchemeRegistry>(), provider.GetRequiredService<IPayoutSchemeRegistry>());

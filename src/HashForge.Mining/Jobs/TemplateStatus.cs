@@ -6,4 +6,7 @@ public sealed record TemplateStatus(string? Tip, DateTimeOffset RefreshedAt)
 {
     /// <summary>What the block being mined would pay in total: the subsidy plus the fees of its transactions.</summary>
     public long? RewardSatoshis { get; init; }
+
+    /// <summary>The difficulty the block being mined must meet.</summary>
+    public double? Difficulty { get; init; }
 }

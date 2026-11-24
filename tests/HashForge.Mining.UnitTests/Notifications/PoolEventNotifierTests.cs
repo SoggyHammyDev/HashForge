@@ -14,7 +14,7 @@ public sealed class PoolEventNotifierTests
     public PoolEventNotifierTests() =>
         _networkStats.Update(new NetworkStats("main", 1, 1, 1_000_000, 0, "00", false, 1, true, 0, TestData.Now));
 
-    private PoolEventNotifier Notifier() => new(_outbox, _networkStats, Options.Create(_options));
+    private PoolEventNotifier Notifier() => new(_outbox, TestData.DifficultyFrom(_networkStats), Options.Create(_options));
 
     [Fact]
     public void GIVEN_OnPoolBestShare_WHEN_NotificationsAreOn_THEN_BestShareIsQueuedWithWorkerAndNetworkDifficulty()
@@ -28,7 +28,7 @@ public sealed class PoolEventNotifierTests
     [Fact]
     public void GIVEN_OnPoolBestShare_WHEN_NetworkDifficultyUnknown_THEN_QueuedWithZeroDifficulty()
     {
-        new PoolEventNotifier(_outbox, new NetworkStatsStore(), Options.Create(_options)).OnPoolBestShare(TestData.Share());
+        new PoolEventNotifier(_outbox, TestData.DifficultyFrom(new NetworkStatsStore()), Options.Create(_options)).OnPoolBestShare(TestData.Share());
 
         _outbox.Received(1).Enqueue(Arg.Is<BestShareNotification>(n => n.NetworkDifficulty == 0));
     }

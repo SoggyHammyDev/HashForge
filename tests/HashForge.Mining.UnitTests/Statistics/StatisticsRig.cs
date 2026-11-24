@@ -21,7 +21,7 @@ internal sealed class StatisticsRig
     {
         var store = new StatisticsStore(options);
         _recorder = new StatisticsRecorder(store, listeners);
-        _reader = new StatisticsReader(store, networkStats, timeProvider);
+        _reader = new StatisticsReader(store, TestData.DifficultyFrom(networkStats), timeProvider);
         _state = new StatisticsState(store);
     }
 

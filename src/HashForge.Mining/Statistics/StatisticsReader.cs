@@ -4,7 +4,7 @@ using HashForge.Mining.Network;
 namespace HashForge.Mining.Statistics;
 
 /// <summary>Turns the live statistics into read-only snapshots for the UI, the API and block records.</summary>
-public sealed class StatisticsReader(IStatisticsStore store, INetworkStatsStore networkStats, TimeProvider timeProvider) : IStatisticsReader
+public sealed class StatisticsReader(IStatisticsStore store, INetworkDifficulty networkDifficulty, TimeProvider timeProvider) : IStatisticsReader
 {
     public PoolSnapshot GetPool(PoolDefinition pool)
     {
@@ -44,7 +44,7 @@ public sealed class StatisticsReader(IStatisticsStore store, INetworkStatsStore 
     }
 
     private StatsSnapshot Snapshot(StatsAccumulator accumulator) =>
-        accumulator.Snapshot(timeProvider.GetUtcNow(), networkStats.Current?.Difficulty ?? 0);
+        accumulator.Snapshot(timeProvider.GetUtcNow(), networkDifficulty.Current);
 
     private MinerSnapshot ToSnapshot(string address, MinerStatistics miner) => new(
         address,

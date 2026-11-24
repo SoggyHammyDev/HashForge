@@ -17,7 +17,7 @@ internal sealed class PayoutRig : IDisposable
     public PayoutRig(IPoolRegistry pools, IPayoutSchemeFactory factory, INetworkStatsStore networkStats)
     {
         _schemes = new PayoutSchemeRegistry(pools, factory);
-        _recorder = new PayoutRecorder(pools, _schemes, networkStats);
+        _recorder = new PayoutRecorder(pools, _schemes, TestData.DifficultyFrom(networkStats));
         _plans = new PayoutPlanSource(_schemes);
         _state = new PayoutState(_schemes);
     }

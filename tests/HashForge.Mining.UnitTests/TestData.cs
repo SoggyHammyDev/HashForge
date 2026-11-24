@@ -2,6 +2,7 @@ using HashForge.Bitcoin.Primitives;
 using HashForge.Bitcoin.Rpc;
 using HashForge.Domain;
 using HashForge.Mining.Jobs;
+using HashForge.Mining.Network;
 using HashForge.Mining.Shares;
 using Microsoft.Extensions.Options;
 
@@ -103,4 +104,12 @@ internal static class TestData
 
     public static FoundBlock Block(string poolName = "pplns", PayoutScheme scheme = PayoutScheme.Pplns, WorkerIdentity? worker = null, bool accepted = true) =>
         new(poolName, scheme, 850_000, "00ab", worker ?? Worker, 312_500_000, [new PayoutEntry(MinerAddress, 312_500_000)], 42, Now, accepted, accepted ? null : "high-hash") { MinersPaid = 1 };
+
+    /// <summary>A difficulty source with no block template yet, so it reports what the network stats say.</summary>
+    public static INetworkDifficulty DifficultyFrom(INetworkStatsStore networkStats)
+    {
+        var templates = Substitute.For<ITemplateRefresher>();
+        templates.Status.Returns(new TemplateStatus(null, DateTimeOffset.MinValue));
+        return new NetworkDifficulty(templates, networkStats);
+    }
 }

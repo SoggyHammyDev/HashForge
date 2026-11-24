@@ -10,7 +10,7 @@ namespace HashForge.Mining.Notifications;
 /// <summary>Decides which pool events deserve a notification and queues them.</summary>
 public sealed class PoolEventNotifier(
     INotificationOutbox outbox,
-    INetworkStatsStore networkStats,
+    INetworkDifficulty networkDifficulty,
     IOptions<NotificationOptions> options) : IBestShareListener, IBlockObserver
 {
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastBestShareSent = new(StringComparer.OrdinalIgnoreCase);
@@ -28,7 +28,7 @@ public sealed class PoolEventNotifier(
         outbox.Enqueue(new BestShareNotification(
             share.PoolName,
             new BestShare(share.ActualDifficulty, share.Worker.FullName, share.Timestamp),
-            networkStats.Current?.Difficulty ?? 0));
+            networkDifficulty.Current));
     }
 
     public Task OnBlockFoundAsync(FoundBlock block, CancellationToken cancellationToken)

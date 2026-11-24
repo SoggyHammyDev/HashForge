@@ -45,6 +45,7 @@ public abstract class WebTestContext : BunitContext
         Services.AddSingleton(AdminAccess);
         Templates.Status.Returns(new TemplateStatus(null, DateTimeOffset.MinValue));
         Services.AddSingleton(Templates);
+        Services.AddSingleton<INetworkDifficulty>(new NetworkDifficulty(Templates, NetworkStats));
     }
 
     protected FakeTimeProvider Time { get; } = new(Now);

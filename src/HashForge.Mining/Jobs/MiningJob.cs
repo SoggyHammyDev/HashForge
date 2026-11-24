@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.Numerics;
 using HashForge.Bitcoin.Primitives;
 using HashForge.Bitcoin.Rpc;
@@ -31,7 +30,7 @@ public sealed class MiningJob
         Payouts = payouts;
         MinersPaid = minersPaid ?? payouts.Count;
         TemplateSequence = templateSequence;
-        Bits = uint.Parse(template.Bits, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        Bits = template.CompactBits();
         NetworkTarget = DifficultyMath.TargetFromCompact(Bits);
         PreviousBlockHash = HashHex.FromDisplayHex(template.PreviousBlockHash);
         MerkleBranch = HashForge.Bitcoin.Primitives.MerkleBranch.Build([.. template.Transactions.Select(t => HashHex.FromDisplayHex(t.TxId))]);

@@ -84,7 +84,7 @@ public sealed class TemplateRefreshTests
 
         _sink.Received(1).Publish(Arg.Is<BlockTemplate>(t => t.PreviousBlockHash == TestData.PreviousBlockHash));
         Assert.Equal(
-            new TemplateStatus(TestData.PreviousBlockHash, TestData.Now) { RewardSatoshis = 312_500_000 },
+            new TemplateStatus(TestData.PreviousBlockHash, TestData.Now) { RewardSatoshis = 312_500_000, Difficulty = TestData.Template().Difficulty() },
             _refresher.Status);
     }
 

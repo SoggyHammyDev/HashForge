@@ -6,7 +6,7 @@ using HashForge.Mining.Shares;
 namespace HashForge.Mining.Payouts;
 
 /// <summary>Feeds accepted shares and found blocks into each pool's payout scheme.</summary>
-public sealed class PayoutRecorder(IPoolRegistry pools, IPayoutSchemeRegistry schemes, INetworkStatsStore networkStats)
+public sealed class PayoutRecorder(IPoolRegistry pools, IPayoutSchemeRegistry schemes, INetworkDifficulty networkDifficulty)
     : IShareObserver, IBlockObserver
 {
     public void OnShare(ShareResult share)
@@ -14,7 +14,7 @@ public sealed class PayoutRecorder(IPoolRegistry pools, IPayoutSchemeRegistry sc
         ArgumentNullException.ThrowIfNull(share);
         if (share.IsAccepted && pools.Find(share.PoolName) is { } pool)
         {
-            schemes.SchemeFor(pool).RecordShare(share.Worker.Address, share.CreditedDifficulty, networkStats.Current?.Difficulty ?? 0);
+            schemes.SchemeFor(pool).RecordShare(share.Worker.Address, share.CreditedDifficulty, networkDifficulty.Current);
         }
     }
 

@@ -60,7 +60,11 @@ public sealed partial class TemplateRefresher(
             LogNewBlock(template.Height, template.PreviousBlockHash);
         }
 
-        _status = new TemplateStatus(template.PreviousBlockHash, timeProvider.GetUtcNow()) { RewardSatoshis = template.CoinbaseValue };
+        _status = new TemplateStatus(template.PreviousBlockHash, timeProvider.GetUtcNow())
+        {
+            RewardSatoshis = template.CoinbaseValue,
+            Difficulty = template.Difficulty(),
+        };
         sink.Publish(template);
     }
 
