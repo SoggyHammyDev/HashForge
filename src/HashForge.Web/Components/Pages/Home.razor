@@ -61,7 +61,7 @@
                             <td class="num">@pool.WorkerCount</td>
                             <td class="num"><EffortMeter Percent="pool.Stats.EffortPercent" /></td>
                             <td class="num">@StatsText.BestDifficulty(pool.Stats.BestShare)</td>
-                            <td class="mono" title="@pool.Stats.BestShare?.Worker">@StatsText.BestWorker(pool.Stats.BestShare)</td>
+                            <td class="mono">@StatsText.BestWorker(pool.Stats.BestShare)</td>
                         </tr>
                     }
                 </tbody>

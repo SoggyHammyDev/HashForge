@@ -9,5 +9,5 @@ public sealed class GetPoolsEndpoint(IPoolOverview overview) : IApiEndpoint
 {
     public void Map(IEndpointRouteBuilder routes) => routes.MapGet("pools", Handle);
 
-    public Ok<ApiResponse<IReadOnlyList<PoolSnapshot>>> Handle() => ApiResults.Ok(overview.GetPools());
+    public Ok<ApiResponse<IReadOnlyList<PoolSnapshot>>> Handle() => ApiResults.Ok<IReadOnlyList<PoolSnapshot>>([.. overview.GetPools().Select(pool => pool.Masked())]);
 }

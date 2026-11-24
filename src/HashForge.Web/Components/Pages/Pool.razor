@@ -44,7 +44,8 @@ else
         }
     </SectionCard>
 
-    <SectionCard Icon="IconKind.Miners" Title="Miners" Aside="@($"{_miners.Count} with shares")" Flush="true">
+    <SectionCard Icon="IconKind.Miners" Title="Miners" Aside="@($"{_miners.Count} with shares")" Flush="true"
+                 Footnote="Addresses are shortened so they cannot be collected from this page. Enter your own above to see your statistics.">
         @if (_miners.Count == 0)
         {
             <p class="empty">No miners have submitted shares yet.</p>
@@ -68,7 +69,7 @@ else
                         @foreach (var miner in _miners)
                         {
                             <tr>
-                                <td class="mono"><a href="pool/@_pool.Name/miner/@miner.Address" title="@miner.Address">@Display.Shorten(miner.Address)</a></td>
+                                <td class="mono">@Display.Shorten(miner.Address)</td>
                                 <td class="num">@miner.Workers.Count</td>
                                 <td class="num">@Display.Hashrate(miner.Stats.Hashrate)</td>
                                 <td class="num">@Display.Count(miner.Stats.Accepted)</td>

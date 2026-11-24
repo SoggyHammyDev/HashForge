@@ -224,4 +224,59 @@ public sealed class ApiTests : IAsyncLifetime
         AssertError(body, ApiError.InternalErrorCode);
         Assert.DoesNotContain("secret", body.ToString());
     }
+
+    private const string LongAddress = "bc1qalicealicealicealicealicealice";
+    private const string LongAddressMasked = "bc1qalicea…ealice";
+
+    [Fact]
+    public async Task GIVEN_GetBlocks_WHEN_BlockHasAddresses_THEN_FinderAndPayoutAddressesAreShortened()
+    {
+        var block = new FoundBlock("solo", PayoutScheme.Solo, 850_001, "00ab", new WorkerIdentity(LongAddress, "rig"), 312_500_000, [new PayoutEntry(LongAddress, 312_500_000)], 87.5, Now, true, null) { MinersPaid = 1 };
+        _blocks.GetRecentAsync(25, Arg.Any<CancellationToken>()).Returns([block]);
+
+        var (_, body) = await GetAsync("/api/blocks");
+
+        var data = body.GetProperty("data")[0];
+        Assert.DoesNotContain(LongAddress, body.GetRawText(), StringComparison.Ordinal);
+        Assert.Equal(LongAddressMasked, data.GetProperty("worker").GetProperty("address").GetString());
+        Assert.Equal($"{LongAddressMasked}.rig", data.GetProperty("worker").GetProperty("fullName").GetString());
+        Assert.Equal(LongAddressMasked, data.GetProperty("payouts")[0].GetProperty("address").GetString());
+        Assert.Equal(312_500_000, data.GetProperty("payouts")[0].GetProperty("satoshis").GetInt64());
+    }
+
+    [Theory]
+    [InlineData("/api/pools")]
+    [InlineData("/api/pools/solo")]
+    public async Task GIVEN_PoolEndpoints_WHEN_PoolHasABestShare_THEN_ItsWorkersAddressIsShortened(string path)
+    {
+        var pool = Pool() with { Stats = Stats() with { BestShare = new BestShare(900, $"{LongAddress}.rig", Now) } };
+        _overview.GetPools().Returns([pool]);
+        _overview.FindPool("solo").Returns(pool);
+
+        var (status, body) = await GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.DoesNotContain(LongAddress, body.GetRawText(), StringComparison.Ordinal);
+        Assert.Contains($"{LongAddressMasked}.rig", body.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GIVEN_GetPool_WHEN_PoolHasNoBestShareYet_THEN_StillReturnsThePool()
+    {
+        _overview.FindPool("solo").Returns(Pool() with { Stats = Stats() with { BestShare = null } });
+
+        var (status, body) = await GetAsync("/api/pools/solo");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("data").GetProperty("stats").GetProperty("bestShare").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("bc1qalicealicealicealicealicealice.rig.one", "bc1qalicea…ealice.rig.one")]
+    [InlineData("bc1qalicealicealicealicealicealice", "bc1qalicea…ealice")]
+    [InlineData("short.rig", "short.rig")]
+    public void GIVEN_MaskWorker_WHEN_NameGiven_THEN_OnlyTheAddressIsShortened(string fullName, string expected)
+    {
+        Assert.Equal(expected, AddressMasking.MaskWorker(fullName));
+    }
 }

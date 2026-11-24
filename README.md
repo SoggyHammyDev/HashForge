@@ -285,8 +285,12 @@ Every response has the same shape. On success `data` is filled in and `errors` i
 |---|---|
 | `GET /api/pools` | Every running pool with live statistics |
 | `GET /api/pools/{name}` | One pool |
-| `GET /api/pools/{name}/miners/{address}` | One miner, with a breakdown per worker |
+| `GET /api/pools/{name}/miners/{address}` | One miner, with a breakdown per worker. You must already know the address |
 | `GET /api/blocks?count=25` | Recent blocks found (1 to 500) |
+
+Lists never give a miner's address in full: the pool and block endpoints shorten every address
+(`bc1qexampl…abc123`), as do the web pages, so neither can be used to collect the addresses of a pool's miners.
+The full address is only ever shown to someone who typed it in.
 | `GET /api/network` | Bitcoin network statistics and node sync state |
 | `GET /healthz` | Liveness check |
 

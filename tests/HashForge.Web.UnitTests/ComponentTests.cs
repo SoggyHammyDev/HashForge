@@ -196,7 +196,7 @@ public sealed class ComponentTests : WebTestContext
         Assert.Contains("3334", pool.Markup);
         Assert.Contains("9 workers", pool.Markup);
         Assert.Single(pool.FindAll("svg[role=img]"));
-        Assert.Equal("pool/pplns/miner/bc1qalicealicealicealicealice", pool.Find("tbody a").GetAttribute("href"));
+        Assert.Contains("bc1qalicea…ealice", pool.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -881,5 +881,39 @@ public sealed class ComponentTests : WebTestContext
 
         Assert.Contains("Confirmations", page.Markup);
         Assert.Contains("after 100 confirmations", page.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_Pool_WHEN_MinersAreListed_THEN_NoFullAddressIsInThePage()
+    {
+        Overview.FindPool("pplns").Returns(PoolSnapshot());
+        Statistics.GetMiners("pplns").Returns([new MinerSnapshot("bc1qalicealicealicealicealice", Stats(), [new WorkerSnapshot("rig1", Stats())])]);
+
+        var pool = Render<Pool>(p => p.Add(x => x.Name, "pplns"));
+
+        Assert.DoesNotContain("bc1qalicealicealicealicealice", pool.Markup, StringComparison.Ordinal);
+        Assert.Contains("Enter your own above", pool.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GIVEN_BlockTable_WHEN_Rendered_THEN_FindersFullAddressIsNotInThePage()
+    {
+        var table = Render<BlockTable>(p => p.Add(t => t.Blocks, [Block()]).Add(t => t.Now, Now));
+
+        Assert.DoesNotContain("bc1qalicealicealicealice", table.Markup, StringComparison.Ordinal);
+        Assert.Contains("bc1qalicea…", table.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GIVEN_Home_WHEN_PoolHasABestShare_THEN_ItsWorkersFullAddressIsNotInThePage()
+    {
+        const string address = "bc1qbobbobbobbobbobbobbobbobbob";
+        var stats = Stats(best: new BestShare(7.7e12, $"{address}.s21", Now));
+        Overview.GetPools().Returns([PoolSnapshot() with { Stats = stats }]);
+        Overview.GetBestShare().Returns(stats.BestShare);
+
+        var home = Render<Home>();
+
+        Assert.DoesNotContain(address, home.Markup, StringComparison.Ordinal);
     }
 }

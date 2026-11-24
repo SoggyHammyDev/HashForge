@@ -9,6 +9,6 @@ public sealed class GetPoolEndpoint(IPoolOverview overview) : IApiEndpoint
 
     public IResult Handle(string name) =>
         overview.FindPool(name) is { } pool
-            ? ApiResults.Ok(pool)
+            ? ApiResults.Ok(pool.Masked())
             : ApiResults.NotFound($"There is no running pool called '{name}'.");
 }
