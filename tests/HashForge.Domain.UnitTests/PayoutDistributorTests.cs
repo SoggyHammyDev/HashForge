@@ -258,4 +258,50 @@ public sealed class PayoutDistributorTests
 
         Assert.Equal([new PayoutEntry("finder", 100_000), new PayoutEntry("largest", 900_000)], payouts);
     }
+
+    [Fact]
+    public void GIVEN_Distribute_WHEN_PortionsAreWholeSatoshis_THEN_EveryMinerGetsExactlyTheirPortion()
+    {
+        // A third of this amount is a whole number, but a third held as a rounded decimal used to lose a satoshi.
+        var payouts = PayoutDistributor.Distribute(Weights(("a", 3), ("b", 2), ("c", 1)), 4_950_000_000, Rules());
+
+        Assert.Equal(
+            [new PayoutEntry("a", 2_475_000_000), new PayoutEntry("b", 1_650_000_000), new PayoutEntry("c", 825_000_000)],
+            payouts);
+    }
+
+    [Fact]
+    public void GIVEN_Distribute_WHEN_WeightsAreTinyFractions_THEN_SplitIsStillExact()
+    {
+        // Regtest and testnet shares are worth far less than one, and must split as cleanly as whole numbers.
+        var payouts = PayoutDistributor.Distribute(Weights(("a", 6e-11), ("b", 4e-11), ("c", 2e-11)), 4_950_000_000, Rules());
+
+        Assert.Equal(4_950_000_000, payouts.Sum(p => p.Satoshis));
+        Assert.All(payouts.Zip([2_475_000_000L, 1_650_000_000L, 825_000_000L]), pair => Assert.InRange(pair.First.Satoshis - pair.Second, -1, 2));
+    }
+
+    [Fact]
+    public void GIVEN_Distribute_WHEN_RewardIsTheLargestPossible_THEN_NoPortionIsOffByMoreThanTheRoundingDown()
+    {
+        const long everyBitcoin = 2_100_000_000_000_000;
+        var weights = Weights(("a", 7), ("b", 5), ("c", 3), ("d", 2), ("e", 1));
+
+        var payouts = PayoutDistributor.Distribute(weights, everyBitcoin, Rules());
+
+        Assert.Equal(everyBitcoin, payouts.Sum(p => p.Satoshis));
+        Assert.Equal(everyBitcoin * 5 / 18, payouts.Single(p => p.Address == "b").Satoshis);
+        Assert.Equal(everyBitcoin * 3 / 18, payouts.Single(p => p.Address == "c").Satoshis);
+        Assert.Equal(everyBitcoin * 2 / 18, payouts.Single(p => p.Address == "d").Satoshis);
+        Assert.Equal(everyBitcoin * 1 / 18, payouts.Single(p => p.Address == "e").Satoshis);
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NaN)]
+    public void GIVEN_Distribute_WHEN_WeightIsNotARealNumber_THEN_MinerIsExcluded(double weight)
+    {
+        var payouts = PayoutDistributor.Distribute(Weights(("a", 1), ("broken", weight)), Reward, Rules());
+
+        Assert.Equal([new PayoutEntry("a", Reward)], payouts);
+    }
 }

@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace HashForge.Domain;
 
 /// <summary>Splits a block reward between miners in proportion to their weights.</summary>
@@ -85,9 +87,11 @@ public static class PayoutDistributor
 
         while (eligible.Count > 0)
         {
-            var total = eligible.Sum(w => w.Value);
+            // Whole-number weights make each portion exact; only the fraction of a satoshi is rounded down.
+            var exact = ExactWeights.ToIntegers([.. eligible.Select(w => w.Value)]);
+            var total = exact.Aggregate(BigInteger.Zero, BigInteger.Add);
             var payouts = eligible
-                .Select(w => new PayoutEntry(w.Key, (long)Math.Floor(distributable * (decimal)(w.Value / total))))
+                .Select((w, index) => new PayoutEntry(w.Key, (long)(distributable * exact[index] / total)))
                 .ToList();
             var kept = payouts.Count(p => p.Satoshis >= rules.MinimumPayoutSatoshis && p.Satoshis > 0);
             if (kept == payouts.Count)
@@ -109,10 +113,10 @@ public static class PayoutDistributor
     private static List<PayoutEntry> PayLargestMiner(IReadOnlyDictionary<string, double> weights, long satoshis) =>
         [.. ByWeight(weights).Take(1).Select(w => new PayoutEntry(w.Key, satoshis))];
 
-    /// <summary>Miners with any weight, largest first, with ties broken by address so the result is repeatable.</summary>
+    /// <summary>Miners with any real weight, largest first, with ties broken by address so the result is repeatable.</summary>
     private static IEnumerable<KeyValuePair<string, double>> ByWeight(IReadOnlyDictionary<string, double> weights) =>
         weights
-            .Where(w => w.Value > 0)
+            .Where(w => w.Value > 0 && double.IsFinite(w.Value))
             .OrderByDescending(w => w.Value)
             .ThenBy(w => w.Key, StringComparer.Ordinal);
 
