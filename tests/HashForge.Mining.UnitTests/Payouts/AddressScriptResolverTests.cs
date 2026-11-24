@@ -76,4 +76,68 @@ public sealed class AddressScriptResolverTests
 
         Assert.False((await _resolver.ResolveAsync("odd", CancellationToken.None)).IsValid);
     }
+
+    [Fact]
+    public async Task GIVEN_ResolveAsync_WHEN_ManyAskAboutTheSameAddressAtOnce_THEN_NodeIsAskedOnce()
+    {
+        var node = new TaskCompletionSource<AddressValidation>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _validator.ValidateAddressAsync("busy", Arg.Any<CancellationToken>()).Returns(node.Task);
+
+        var waiting = Enumerable.Range(0, 50).Select(_ => _resolver.ResolveAsync("busy", CancellationToken.None)).ToList();
+        node.SetResult(new AddressValidation { IsValid = true, ScriptPubKey = "51" });
+        var resolutions = await Task.WhenAll(waiting);
+
+        Assert.All(resolutions, resolution => Assert.True(resolution.IsValid));
+        await _validator.Received(1).ValidateAddressAsync("busy", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GIVEN_ResolveAsync_WHEN_ManyDifferentAddressesArriveAtOnce_THEN_OnlyAFewAreAskedTogether()
+    {
+        var gate = new TaskCompletionSource<AddressValidation>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var asked = 0;
+        _validator.ValidateAddressAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            Interlocked.Increment(ref asked);
+            return gate.Task;
+        });
+
+        var waiting = Enumerable.Range(0, 40).Select(i => _resolver.ResolveAsync($"address{i}", CancellationToken.None)).ToList();
+        var askedWhileNodeIsBusy = Volatile.Read(ref asked);
+        gate.SetResult(new AddressValidation { IsValid = true, ScriptPubKey = "51" });
+        await Task.WhenAll(waiting);
+
+        Assert.Equal(AddressScriptResolver.MaxConcurrentLookups, askedWhileNodeIsBusy);
+        Assert.Equal(40, asked);
+    }
+
+    [Fact]
+    public async Task GIVEN_ResolveAsync_WHEN_OneCallerGivesUp_THEN_OthersStillGetTheAnswer()
+    {
+        var node = new TaskCompletionSource<AddressValidation>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _validator.ValidateAddressAsync("slow", Arg.Any<CancellationToken>()).Returns(node.Task);
+        using var impatient = new CancellationTokenSource();
+
+        var abandoned = _resolver.ResolveAsync("slow", impatient.Token);
+        var patient = _resolver.ResolveAsync("slow", CancellationToken.None);
+        await impatient.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abandoned);
+        node.SetResult(new AddressValidation { IsValid = true, ScriptPubKey = "51" });
+
+        Assert.True((await patient).IsValid);
+    }
+
+    [Fact]
+    public async Task GIVEN_ResolveAsync_WHEN_NodeFailsOnce_THEN_NextCallAsksAgain()
+    {
+        _validator.ValidateAddressAsync("flaky", Arg.Any<CancellationToken>())
+            .Returns(
+                _ => Task.FromException<AddressValidation>(new HttpRequestException("node unavailable")),
+                _ => Task.FromResult(new AddressValidation { IsValid = true, ScriptPubKey = "51" }));
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => _resolver.ResolveAsync("flaky", CancellationToken.None));
+        var second = await _resolver.ResolveAsync("flaky", CancellationToken.None);
+
+        Assert.True(second.IsValid);
+    }
 }
