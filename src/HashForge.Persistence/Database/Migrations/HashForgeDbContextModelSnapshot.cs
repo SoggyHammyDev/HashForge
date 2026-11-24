@@ -32,6 +32,9 @@ namespace HashForge.Persistence.Database.Migrations
                     b.Property<bool>("Accepted")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("Confirmations")
+                        .HasColumnType("integer");
+
                     b.Property<double>("EffortPercent")
                         .HasColumnType("double precision");
 
@@ -48,6 +51,9 @@ namespace HashForge.Persistence.Database.Migrations
 
                     b.Property<int>("MinersPaid")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("Orphaned")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("PoolName")
                         .IsRequired()

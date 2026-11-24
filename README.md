@@ -60,6 +60,8 @@ Core node, Redis, PostgreSQL and the pool itself.
   every block found with its payout split.
 - **A page for every block found**, listing what each address was paid (addresses are shortened) and linking
   to the block on a public explorer for the network the node is on: mainnet, testnet4, testnet3 or signet.
+- **Honest block statuses.** The pool keeps asking the node where each found block stands, so a block shows as
+  Accepted, Confirmed (100 deep, reward spendable), Orphaned (lost to a competing block), Stale or Rejected.
 - **Shares are never written to a database.** They live in memory; per-miner totals are snapshotted to Redis
   every few seconds so a restart loses almost nothing.
 

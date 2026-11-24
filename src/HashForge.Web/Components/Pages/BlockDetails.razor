@@ -20,7 +20,7 @@ else
         <a class="back-link" href="blocks">← All blocks</a>
         <h1>Block @Display.Count(_block.Height) <SchemeBadge Scheme="_block.Scheme" /></h1>
         <p class="wrap mono">@_block.Hash</p>
-        @if (_explorer is not null)
+        @if (_explorer is not null && WasPaid)
         {
             <p><a class="explorer-link" href="@_explorer.BlockUri(_block.Hash)" target="_blank" rel="noopener noreferrer">View on @_explorer.Name ↗</a></p>
         }
@@ -40,21 +40,16 @@ else
             <dt>Found by</dt>
             <dd class="mono">@Display.Shorten(_block.Worker.Address)</dd>
             <dt>Status</dt>
-            <dd>
-                @if (_block.Accepted)
-                {
-                    <StatusPill Kind="StatusKind.Good" Text="Accepted" />
-                }
-                else
-                {
-                    <StatusPill Kind="StatusKind.Bad" Text="@($"Rejected: {_block.RejectReason}")" />
-                }
-            </dd>
+            <dd><BlockStatusPill Block="_block" /> <span class="muted">@StatusMeaning</span></dd>
+            @if (_block.Status is BlockStatus.Accepted or BlockStatus.Confirmed)
+            {
+                <dt>Confirmations</dt>
+                <dd>@Display.Count(_block.Confirmations)</dd>
+            }
         </dl>
     </SectionCard>
 
-    <SectionCard Icon="IconKind.Miners" Title="Payouts" Aside="@($"{_block.Payouts.Count} outputs")" Flush="true"
-                 Footnote="Paid directly by the block itself. Addresses are shortened here; the full list is in the block on the explorer.">
+    <SectionCard Icon="IconKind.Miners" Title="Payouts" Aside="@($"{_block.Payouts.Count} outputs")" Flush="true" Footnote="@PayoutNote">
         <div class="table-scroll">
             <table>
                 <thead>
@@ -97,6 +92,21 @@ else
         _block = _isValidHash ? await BlockRepository.FindAsync(Hash, Cancellation) : null;
         _explorer = BlockExplorers.ForChain(NetworkStats.Current?.Chain);
     }
+
+    private bool WasPaid => _block?.Status is BlockStatus.Accepted or BlockStatus.Confirmed;
+
+    private string PayoutNote => WasPaid
+        ? "Paid directly by the block itself. Addresses are shortened here; the full list is in the block on the explorer."
+        : "This block did not stay on the chain, so these amounts were never paid.";
+
+    private string StatusMeaning => _block?.Status switch
+    {
+        BlockStatus.Confirmed => "On the chain, and the reward can be spent.",
+        BlockStatus.Accepted => $"On the chain. The reward can be spent after {FoundBlock.MaturityConfirmations} confirmations.",
+        BlockStatus.Orphaned => "The network built on a competing block at the same height.",
+        BlockStatus.Stale => "The chain had already moved on when this block arrived.",
+        _ => "The node refused this block.",
+    };
 
     private double ShareOfReward(long satoshis) =>
         _block is { RewardSatoshis: > 0 } ? 100.0 * satoshis / _block.RewardSatoshis : 0;

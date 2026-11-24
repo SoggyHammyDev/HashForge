@@ -1,0 +1,23 @@
+@* What became of a found block, in words. *@
+<StatusPill Kind="Kind" Text="@Text" />
+
+@code {
+    [Parameter, EditorRequired]
+    public FoundBlock Block { get; set; } = default!;
+
+    private StatusKind Kind => Block.Status switch
+    {
+        BlockStatus.Confirmed => StatusKind.Good,
+        BlockStatus.Accepted => Block.Confirmations > 0 ? StatusKind.Good : StatusKind.Busy,
+        _ => StatusKind.Bad,
+    };
+
+    private string Text => Block.Status switch
+    {
+        BlockStatus.Confirmed => "Confirmed",
+        BlockStatus.Accepted => "Accepted",
+        BlockStatus.Orphaned => "Orphaned",
+        BlockStatus.Stale => "Stale",
+        _ => $"Rejected: {Block.RejectReason}",
+    };
+}

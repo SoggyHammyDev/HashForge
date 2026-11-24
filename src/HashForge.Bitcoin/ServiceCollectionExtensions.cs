@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IChainInfoSource>(sp => sp.GetRequiredService<BitcoinNodeClient>());
         services.AddSingleton<IChainTipSource>(sp => sp.GetRequiredService<BitcoinNodeClient>());
         services.AddSingleton<IAddressValidator>(sp => sp.GetRequiredService<BitcoinNodeClient>());
+        services.AddSingleton<IBlockHeaderSource>(sp => sp.GetRequiredService<BitcoinNodeClient>());
         return services;
     }
 

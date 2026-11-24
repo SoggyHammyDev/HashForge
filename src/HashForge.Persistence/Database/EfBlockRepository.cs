@@ -46,6 +46,38 @@ public sealed class EfBlockRepository(IDbContextFactory<HashForgeDbContext> cont
         }
     }
 
+    public async Task<IReadOnlyList<FoundBlock>> GetUnsettledAsync(int fromHeight, CancellationToken cancellationToken)
+    {
+        var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using (context.ConfigureAwait(false))
+        {
+            var entities = await context.Blocks
+                .AsNoTracking()
+                .Include(b => b.Payouts)
+                .Where(b => b.Accepted && b.Height >= fromHeight && b.Confirmations < FoundBlock.MaturityConfirmations)
+                .OrderBy(b => b.Id)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return [.. entities.Select(ToModel)];
+        }
+    }
+
+    public async Task UpdateChainStateAsync(string hash, int confirmations, bool orphaned, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(hash);
+
+        var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using (context.ConfigureAwait(false))
+        {
+            await context.Blocks
+                .Where(b => b.Hash == hash)
+                .ExecuteUpdateAsync(
+                    update => update.SetProperty(b => b.Confirmations, confirmations).SetProperty(b => b.Orphaned, orphaned),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
     public async Task<FoundBlock?> FindAsync(string hash, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(hash);
@@ -77,6 +109,8 @@ public sealed class EfBlockRepository(IDbContextFactory<HashForgeDbContext> cont
         Accepted = block.Accepted,
         RejectReason = block.RejectReason,
         MinersPaid = block.MinersPaid,
+        Confirmations = block.Confirmations,
+        Orphaned = block.Orphaned,
         Payouts = [.. block.Payouts.Select(p => new BlockPayoutEntity { Address = p.Address, Satoshis = p.Satoshis })],
     };
 
@@ -94,5 +128,7 @@ public sealed class EfBlockRepository(IDbContextFactory<HashForgeDbContext> cont
         entity.RejectReason)
     {
         MinersPaid = entity.MinersPaid,
+        Confirmations = entity.Confirmations,
+        Orphaned = entity.Orphaned,
     };
 }

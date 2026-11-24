@@ -36,6 +36,7 @@ public sealed class ServiceCollectionExtensionsTests
         Assert.Same(client, provider.GetRequiredService<IChainInfoSource>());
         Assert.Same(client, provider.GetRequiredService<IChainTipSource>());
         Assert.Same(client, provider.GetRequiredService<IAddressValidator>());
+        Assert.Same(client, provider.GetRequiredService<IBlockHeaderSource>());
     }
 
     [Fact]

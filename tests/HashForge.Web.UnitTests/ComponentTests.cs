@@ -829,4 +829,57 @@ public sealed class ComponentTests : WebTestContext
 
         Assert.Contains("Pool", table.FindAll("th").Select(th => th.TextContent));
     }
+
+    [Theory]
+    [InlineData(true, null, false, 0, "Accepted", "pill-busy")]
+    [InlineData(true, null, false, 3, "Accepted", "pill-good")]
+    [InlineData(true, null, false, 100, "Confirmed", "pill-good")]
+    [InlineData(true, null, true, 0, "Orphaned", "pill-bad")]
+    [InlineData(false, "inconclusive", false, 0, "Stale", "pill-bad")]
+    [InlineData(false, "high-hash", false, 0, "Rejected: high-hash", "pill-bad")]
+    public void GIVEN_BlockStatusPill_WHEN_BlockFateVaries_THEN_NamesItWithMatchingTone(
+        bool accepted, string? rejectReason, bool orphaned, int confirmations, string expectedText, string expectedClass)
+    {
+        var block = Block() with { Accepted = accepted, RejectReason = rejectReason, Orphaned = orphaned, Confirmations = confirmations };
+
+        var pill = Render<BlockStatusPill>(p => p.Add(x => x.Block, block)).Find(".pill");
+
+        Assert.Equal(expectedText, pill.TextContent);
+        Assert.Contains(expectedClass, pill.ClassList);
+    }
+
+    [Fact]
+    public void GIVEN_BlockTable_WHEN_BlockWasOrphaned_THEN_StatusSaysOrphanedNotAccepted()
+    {
+        var table = Render<BlockTable>(p => p.Add(t => t.Blocks, [Block() with { Orphaned = true }]).Add(t => t.Now, Now));
+
+        var status = table.Find("tbody tr").QuerySelectorAll("td")[^1].TextContent;
+        Assert.Contains("Orphaned", status);
+        Assert.DoesNotContain("Accepted", status);
+    }
+
+    [Fact]
+    public void GIVEN_BlockDetails_WHEN_BlockWasOrphaned_THEN_SaysNothingWasPaidAndOffersNoExplorerLink()
+    {
+        Blocks.FindAsync(BlockHash, Arg.Any<CancellationToken>()).Returns(PaidBlock() with { Orphaned = true });
+        NetworkStats.Current.Returns(Network());
+
+        var page = Render<BlockDetails>(p => p.Add(x => x.Hash, BlockHash));
+
+        Assert.Contains("Orphaned", page.Markup);
+        Assert.Contains("these amounts were never paid", page.Markup);
+        Assert.Empty(page.FindAll("a.explorer-link"));
+        Assert.DoesNotContain("Confirmations", page.Markup);
+    }
+
+    [Fact]
+    public void GIVEN_BlockDetails_WHEN_BlockIsOnTheChain_THEN_ShowsItsConfirmations()
+    {
+        Blocks.FindAsync(BlockHash, Arg.Any<CancellationToken>()).Returns(PaidBlock() with { Confirmations = 12 });
+
+        var page = Render<BlockDetails>(p => p.Add(x => x.Hash, BlockHash));
+
+        Assert.Contains("Confirmations", page.Markup);
+        Assert.Contains("after 100 confirmations", page.Markup);
+    }
 }

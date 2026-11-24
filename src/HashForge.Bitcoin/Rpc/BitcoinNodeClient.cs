@@ -2,8 +2,11 @@
 
 /// <summary>The Bitcoin Core RPC calls the pool relies on.</summary>
 public sealed class BitcoinNodeClient(IBitcoinRpcInvoker invoker)
-    : IBlockTemplateSource, IBlockSubmitter, IChainInfoSource, IChainTipSource, IAddressValidator
+    : IBlockTemplateSource, IBlockSubmitter, IChainInfoSource, IChainTipSource, IAddressValidator, IBlockHeaderSource
 {
+    /// <summary>Bitcoin Core's error code for a block or address it does not know.</summary>
+    public const int NotFoundErrorCode = -5;
+
     private static readonly object TemplateRequest = new { rules = new[] { "segwit" } };
 
     public Task<BlockTemplate> GetBlockTemplateAsync(CancellationToken cancellationToken) =>
@@ -26,6 +29,18 @@ public sealed class BitcoinNodeClient(IBitcoinRpcInvoker invoker)
 
     public Task<AddressValidation> ValidateAddressAsync(string address, CancellationToken cancellationToken) =>
         InvokeRequiredAsync<AddressValidation>("validateaddress", [address], cancellationToken);
+
+    public async Task<BlockHeaderInfo?> FindBlockHeaderAsync(string hash, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await invoker.InvokeAsync<BlockHeaderInfo>("getblockheader", [hash], cancellationToken).ConfigureAwait(false);
+        }
+        catch (BitcoinRpcException exception) when (exception.Code == NotFoundErrorCode)
+        {
+            return null;
+        }
+    }
 
     private async Task<T> InvokeRequiredAsync<T>(string method, IReadOnlyList<object?> parameters, CancellationToken cancellationToken)
         where T : class

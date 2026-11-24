@@ -41,4 +41,25 @@ public sealed class FoundBlockTests
 
         Assert.DoesNotContain(Enumerable.Range(0, payouts), block.IsPoolFee);
     }
+
+    [Theory]
+    [InlineData(true, null, false, 0, BlockStatus.Accepted)]
+    [InlineData(true, null, false, 99, BlockStatus.Accepted)]
+    [InlineData(true, null, false, 100, BlockStatus.Confirmed)]
+    [InlineData(true, null, true, 0, BlockStatus.Orphaned)]
+    [InlineData(false, "high-hash", false, 0, BlockStatus.Rejected)]
+    [InlineData(false, null, false, 0, BlockStatus.Rejected)]
+    [InlineData(false, "inconclusive", false, 0, BlockStatus.Stale)]
+    [InlineData(false, "duplicate-inconclusive", false, 0, BlockStatus.Stale)]
+    [InlineData(false, "stale-prevblk", false, 0, BlockStatus.Stale)]
+    public void GIVEN_Status_WHEN_NodeVerdictAndChainStateVary_THEN_SaysWhatBecameOfTheBlock(
+        bool accepted, string? rejectReason, bool orphaned, int confirmations, BlockStatus expected)
+    {
+        var block = Block(payouts: 2, minersPaid: 1) with
+        {
+            Accepted = accepted, RejectReason = rejectReason, Orphaned = orphaned, Confirmations = confirmations,
+        };
+
+        Assert.Equal(expected, block.Status);
+    }
 }

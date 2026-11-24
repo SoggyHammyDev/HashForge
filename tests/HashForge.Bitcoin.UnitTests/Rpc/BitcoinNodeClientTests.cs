@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using HashForge.Bitcoin.Rpc;
+using NSubstitute.ExceptionExtensions;
 
 namespace HashForge.Bitcoin.UnitTests.Rpc;
 
@@ -91,5 +92,41 @@ public sealed class BitcoinNodeClientTests
 
         Assert.Same(validation, await _client.ValidateAddressAsync("bc1q", CancellationToken.None));
     }
-}
 
+    [Fact]
+    public async Task GIVEN_FindBlockHeaderAsync_WHEN_NodeKnowsTheBlock_THEN_ReturnsItsPlaceOnTheChain()
+    {
+        _invoker.InvokeAsync<BlockHeaderInfo>("getblockheader", Arg.Is<IReadOnlyList<object?>>(p => (string)p[0]! == "00ab"), Arg.Any<CancellationToken>())
+            .Returns(new BlockHeaderInfo { Confirmations = 3, Height = 850_000 });
+
+        var header = await _client.FindBlockHeaderAsync("00ab", CancellationToken.None);
+
+        Assert.NotNull(header);
+        Assert.Equal(3, header.Confirmations);
+        Assert.True(header.IsOnBestChain);
+    }
+
+    [Fact]
+    public void GIVEN_IsOnBestChain_WHEN_ConfirmationsAreNegative_THEN_IsFalse()
+    {
+        Assert.False(new BlockHeaderInfo { Confirmations = -1 }.IsOnBestChain);
+    }
+
+    [Fact]
+    public async Task GIVEN_FindBlockHeaderAsync_WHEN_NodeDoesNotKnowTheBlock_THEN_ReturnsNull()
+    {
+        _invoker.InvokeAsync<BlockHeaderInfo>(default!, default!, default)
+            .ThrowsAsyncForAnyArgs(new BitcoinRpcException(BitcoinNodeClient.NotFoundErrorCode, "Block not found"));
+
+        Assert.Null(await _client.FindBlockHeaderAsync("00ab", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GIVEN_FindBlockHeaderAsync_WHEN_NodeFailsForAnotherReason_THEN_ErrorIsNotSwallowed()
+    {
+        _invoker.InvokeAsync<BlockHeaderInfo>(default!, default!, default)
+            .ThrowsAsyncForAnyArgs(new BitcoinRpcException(-28, "Loading block index"));
+
+        await Assert.ThrowsAsync<BitcoinRpcException>(() => _client.FindBlockHeaderAsync("00ab", CancellationToken.None));
+    }
+}

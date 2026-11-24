@@ -30,6 +30,7 @@ public sealed class ServiceCollectionExtensionsTests
             .AddSingleton(Substitute.For<IChainInfoSource>())
             .AddSingleton(Substitute.For<IChainTipSource>())
             .AddSingleton(Substitute.For<IAddressValidator>())
+            .AddSingleton(Substitute.For<IBlockHeaderSource>())
             .AddSingleton(Substitute.For<IBlockNotificationSource>())
             .AddSingleton(Substitute.For<IHotStateStore>())
             .AddSingleton(Substitute.For<IBlockRepository>())
@@ -98,7 +99,7 @@ public sealed class ServiceCollectionExtensionsTests
 
         var jobs = provider.GetServices<IPeriodicJob>().Select(j => j.Name);
 
-        Assert.Equal(["chain-tip-poller", "network-stats", "state-snapshot", "pool-history", "miner-history"], jobs);
+        Assert.Equal(["chain-tip-poller", "network-stats", "state-snapshot", "pool-history", "block-status", "miner-history"], jobs);
     }
 
     [Fact]

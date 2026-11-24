@@ -69,6 +69,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPeriodicJob, HotStateSnapshotJob>();
         services.AddSingleton<IPeriodicJob, PoolHistorySampler>();
 
+        services.AddSingleton<IPeriodicJob, BlockStatusJob>();
         services.AddSingleton<MinerHistoryStore>();
         services.AddSingleton<IMinerHistory>(sp => sp.GetRequiredService<MinerHistoryStore>());
         services.AddSingleton<IStatePersistable, MinerHistoryState>();

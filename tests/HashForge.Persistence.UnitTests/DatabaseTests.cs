@@ -179,7 +179,7 @@ public sealed class DatabaseTests : IDisposable
 
         Assert.False(context.Database.HasPendingModelChanges());
         Assert.Contains("InitialCreate", context.Database.GetMigrations().First());
-        Assert.Equal(3, context.Database.GetMigrations().Count());
+        Assert.Equal(4, context.Database.GetMigrations().Count());
     }
 
     [Fact]
@@ -217,5 +217,39 @@ public sealed class DatabaseTests : IDisposable
         var recent = await repository.GetRecentForPoolAsync("pplns", 2, CancellationToken.None);
 
         Assert.Equal([4, 3], recent.Select(b => b.Height));
+    }
+
+    [Fact]
+    public async Task GIVEN_UpdateChainStateAsync_WHEN_BlockIsOrphaned_THEN_ItReadsBackAsOrphaned()
+    {
+        var repository = new EfBlockRepository(_factory);
+        await repository.AddAsync(Block(1, Now), CancellationToken.None);
+        await repository.AddAsync(Block(2, Now.AddHours(1)), CancellationToken.None);
+
+        await repository.UpdateChainStateAsync("hash-1", 0, true, CancellationToken.None);
+        await repository.UpdateChainStateAsync("hash-2", 7, false, CancellationToken.None);
+
+        var first = await repository.FindAsync("hash-1", CancellationToken.None);
+        var second = await repository.FindAsync("hash-2", CancellationToken.None);
+        Assert.Equal(BlockStatus.Orphaned, first!.Status);
+        Assert.Equal(7, second!.Confirmations);
+        Assert.Equal(BlockStatus.Accepted, second.Status);
+    }
+
+    [Fact]
+    public async Task GIVEN_GetUnsettledAsync_WHEN_BlocksAreRejectedMatureOrTooOld_THEN_TheyAreLeftOut()
+    {
+        var repository = new EfBlockRepository(_factory);
+        await repository.AddAsync(Block(50, Now), CancellationToken.None);
+        await repository.AddAsync(Block(100, Now), CancellationToken.None);
+        await repository.AddAsync(Block(101, Now, accepted: false), CancellationToken.None);
+        await repository.AddAsync(Block(102, Now), CancellationToken.None);
+        await repository.AddAsync(Block(103, Now), CancellationToken.None);
+        await repository.UpdateChainStateAsync("hash-102", FoundBlock.MaturityConfirmations, false, CancellationToken.None);
+        await repository.UpdateChainStateAsync("hash-103", 0, true, CancellationToken.None);
+
+        var unsettled = await repository.GetUnsettledAsync(100, CancellationToken.None);
+
+        Assert.Equal([100, 103], unsettled.Select(b => b.Height));
     }
 }

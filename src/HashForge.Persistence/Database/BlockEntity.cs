@@ -30,5 +30,9 @@ public sealed class BlockEntity
 
     public int MinersPaid { get; set; }
 
+    public int Confirmations { get; set; }
+
+    public bool Orphaned { get; set; }
+
     public ICollection<BlockPayoutEntity> Payouts { get; init; } = [];
 }

@@ -35,16 +35,7 @@ else
                         <td class="num">@Display.Bitcoin(block.RewardSatoshis)</td>
                         <td class="num">@block.MinersPaid</td>
                         <td>@Display.Age(block.FoundAt, Now)</td>
-                        <td>
-                            @if (block.Accepted)
-                            {
-                                <StatusPill Kind="StatusKind.Good" Text="Accepted" />
-                            }
-                            else
-                            {
-                                <StatusPill Kind="StatusKind.Bad" Text="@($"Rejected: {block.RejectReason}")" />
-                            }
-                        </td>
+                        <td><BlockStatusPill Block="block" /></td>
                     </tr>
                 }
             </tbody>
