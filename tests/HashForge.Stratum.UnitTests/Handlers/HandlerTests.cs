@@ -165,6 +165,23 @@ public sealed class HandlerTests
         });
     }
 
+    [Theory]
+    [InlineData("Gårdsrigg")]
+    [InlineData("Kjøkken æøå")]
+    [InlineData("矿机一号")]
+    [InlineData("garage 🔥")]
+    public async Task GIVEN_Authorize_WHEN_WorkerNameIsNotEnglish_THEN_WorkerIsAuthorisedUnderThatName(string workerName)
+    {
+        var session = SubscribedSession();
+        var username = $"bc1qmineraddress000.{workerName}";
+
+        var reply = await Authorize().HandleAsync(
+            session, StratumTestKit.Request("mining.authorize", username, "x"), CancellationToken.None);
+
+        Assert.Equal(true, reply.Result);
+        Assert.Equal(new WorkerIdentity(StratumTestKit.MinerAddress, workerName), session.Workers.Find(username));
+    }
+
     [Fact]
     public async Task GIVEN_Authorize_WHEN_NodeRejectsAddress_THEN_ConnectionIsDroppedAndReasonIsLogged()
     {
@@ -189,8 +206,7 @@ public sealed class HandlerTests
     [InlineData("")]
     [InlineData(".rig1")]
     [InlineData("not an address.rig1")]
-    [InlineData("bc1qmineraddress000.rig one")]
-    [InlineData("bc1qmineraddress000.<script>")]
+    [InlineData("bc1qmineraddress000.rig\nforged line")]
     [InlineData("bc1qmineraddress000.a-worker-name-that-is-much-longer-than-allowed")]
     public async Task GIVEN_Authorize_WHEN_UsernameHasNoAddress_THEN_ConnectionIsDroppedWithoutAskingNode(string username)
     {

@@ -39,16 +39,28 @@ public sealed class WorkerIdentityTests
     [InlineData(".rig1")]
     [InlineData("short.rig1")]
     [InlineData("not an address at all.rig1")]
-    [InlineData("bc1qaddress0000.rig one")]
     [InlineData("bc1qaddress0000.rig\nINFO forged log line")]
-    [InlineData("bc1qaddress0000.<b>x</b>")]
+    [InlineData("bc1qaddress0000.rig\u202Egnp.exe")]
     [InlineData("bc1qaddress0000.a-worker-name-that-is-much-longer-than-allowed")]
-    public void GIVEN_TryParse_WHEN_AddressIsMissing_THEN_ReturnsFalse(string? username)
+    public void GIVEN_TryParse_WHEN_AddressOrWorkerNameIsNotAcceptable_THEN_ReturnsFalse(string? username)
     {
         var parsed = WorkerIdentity.TryParse(username, out var identity);
 
         Assert.False(parsed);
         Assert.Null(identity);
+    }
+
+    [Theory]
+    [InlineData("bc1qaddress0000.Gårdsrigg", "Gårdsrigg")]
+    [InlineData("bc1qaddress0000.Kjøkken æøå", "Kjøkken æøå")]
+    [InlineData("bc1qaddress0000.矿机一号", "矿机一号")]
+    [InlineData("bc1qaddress0000.garage 🔥", "garage 🔥")]
+    public void GIVEN_TryParse_WHEN_WorkerNameIsWrittenInAnyLanguage_THEN_ItIsKept(string username, string expectedWorker)
+    {
+        Assert.True(WorkerIdentity.TryParse(username, out var identity));
+
+        Assert.Equal("bc1qaddress0000", identity!.Address);
+        Assert.Equal(expectedWorker, identity.WorkerName);
     }
 
     [Fact]

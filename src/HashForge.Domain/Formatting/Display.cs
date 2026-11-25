@@ -51,9 +51,18 @@ public static class Display
     public static string Shorten(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return value.Length <= ShortPrefixLength + ShortSuffixLength + 1
+        if (value.Length <= ShortPrefixLength + ShortSuffixLength + 1)
+        {
+            return value;
+        }
+
+        // Cut between whole characters: a worker's name can end the value, and an accented letter or an
+        // emoji is stored as several parts that must stay together to be shown.
+        var characters = new StringInfo(value);
+        var count = characters.LengthInTextElements;
+        return count <= ShortPrefixLength + ShortSuffixLength + 1
             ? value
-            : $"{value[..ShortPrefixLength]}…{value[^ShortSuffixLength..]}";
+            : $"{characters.SubstringByTextElements(0, ShortPrefixLength)}…{characters.SubstringByTextElements(count - ShortSuffixLength)}";
     }
 
     private static string Scale(double value, string[] units)

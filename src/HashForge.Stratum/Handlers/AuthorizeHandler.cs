@@ -17,7 +17,7 @@ public sealed partial class AuthorizeHandler(
     ILogger<AuthorizeHandler> logger) : IStratumMethodHandler
 {
     private const string MissingAddressReason =
-        "the username must be a Bitcoin address, optionally followed by a dot and a worker name of letters, digits, '.', '_' or '-'";
+        "the username must be a Bitcoin address, optionally followed by a dot and a worker name of up to 32 characters";
     private const string DifferentAddressReason = "this connection is already mining for a different address";
     private const string TooManyWorkersReason = "this connection has authorised too many workers";
 

@@ -1,10 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text.RegularExpressions;
 
 namespace HashForge.Domain;
 
 /// <summary>A miner's payout address plus the name of one of their machines.</summary>
-public sealed partial record WorkerIdentity(string Address, string WorkerName)
+public sealed record WorkerIdentity(string Address, string WorkerName)
 {
     public const string DefaultWorkerName = "default";
 
@@ -14,7 +13,8 @@ public sealed partial record WorkerIdentity(string Address, string WorkerName)
 
     /// <summary>
     /// Parses a Stratum username of the form <c>address</c> or <c>address.worker</c>. Both parts come from
-    /// the miner, so anything not shaped like an address, or a worker name with unusual characters, is refused.
+    /// the miner, so anything not shaped like an address, or a worker name <see cref="WorkerNameFormat"/>
+    /// does not accept, is refused. The worker name may be written in any language.
     /// </summary>
     public static bool TryParse(string? username, [NotNullWhen(true)] out WorkerIdentity? identity)
     {
@@ -26,7 +26,7 @@ public sealed partial record WorkerIdentity(string Address, string WorkerName)
 
         var parts = username.Trim().Split(Separator, 2, StringSplitOptions.TrimEntries);
         var workerName = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : DefaultWorkerName;
-        if (!AddressFormat.IsPlausible(parts[0]) || !WorkerNamePattern().IsMatch(workerName))
+        if (!AddressFormat.IsPlausible(parts[0]) || !WorkerNameFormat.IsAcceptable(workerName))
         {
             return false;
         }
@@ -36,7 +36,4 @@ public sealed partial record WorkerIdentity(string Address, string WorkerName)
     }
 
     public override string ToString() => FullName;
-
-    [GeneratedRegex("^[A-Za-z0-9_.-]{1,32}$")]
-    private static partial Regex WorkerNamePattern();
 }

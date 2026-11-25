@@ -41,6 +41,14 @@ public sealed class TransportTests
     }
 
     [Fact]
+    public async Task GIVEN_ReadLineAsync_WHEN_ACharacterOfSeveralBytesArrivesSplitAcrossReads_THEN_ItIsReadWhole()
+    {
+        var reader = Reader("Gårdsrigg æøå 矿机 🔥\n", maxLineLength: 64, chunkSize: 1);
+
+        Assert.Equal("Gårdsrigg æøå 矿机 🔥", await reader.ReadLineAsync(CancellationToken.None));
+    }
+
+    [Fact]
     public async Task GIVEN_ReadLineAsync_WHEN_LineExceedsLimit_THEN_ThrowsInvalidData()
     {
         var reader = Reader(new string('x', 100) + "\n", maxLineLength: 16);

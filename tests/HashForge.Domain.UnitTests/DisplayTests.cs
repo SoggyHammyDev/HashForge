@@ -67,4 +67,12 @@ public sealed class DisplayTests
         Assert.Equal("bc1qabcdef…uvwxyz", Display.Shorten("bc1qabcdefghijklmnopqrstuvwxyz"));
         Assert.Equal("short.rig1", Display.Shorten("short.rig1"));
     }
+
+    [Fact]
+    public void GIVEN_Shorten_WHEN_ValueEndsInCharactersStoredInSeveralParts_THEN_NoCharacterIsCutInHalf()
+    {
+        var shortened = Display.Shorten("bc1qabcdefghijklmnop.rig🔥🇸🇪🇳🇴🔥🔥🔥");
+
+        Assert.Equal("bc1qabcdef…🔥🇸🇪🇳🇴🔥🔥🔥", shortened);
+    }
 }
