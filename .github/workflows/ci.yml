@@ -2,7 +2,7 @@ name: Build and test
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/standalone-bitcoin-node]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -58,3 +58,11 @@ jobs:
 
       - name: Build the Bitcoin node image
         run: docker build --tag hashforge-bitcoind:ci docker/bitcoind
+
+  importer:
+    name: Blockchain importer fixture tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -m unittest discover -s tools/node -p 'test_*.py'
