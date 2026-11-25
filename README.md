@@ -125,7 +125,7 @@ page show the sync progress.
 | Field | Value |
 |---|---|
 | Pool URL | `stratum+tcp://<your-host>:<port>` |
-| Username | Your Bitcoin address, optionally followed by `.` and a worker name, e.g. `bc1q...xyz.garage`. A worker name can be up to 32 characters in any language, including spaces and emoji. |
+| Username | Your Bitcoin address, optionally followed by `.` and a worker name, e.g. `bc1q...xyz.garage`. A worker name can be up to 32 letters and digits in any language, plus `.`, `_` and `-`. |
 | Password | Anything (it is ignored) |
 
 ### Where the data lives

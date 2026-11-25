@@ -13,10 +13,6 @@ public sealed class WorkerNameFormatTests
     [InlineData("מכונה")]
     [InlineData("مزرعة")]
     [InlineData("खनिक")]
-    [InlineData("rig one")]
-    [InlineData("garage 🔥")]
-    [InlineData("👨‍👩‍👧 🇸🇪")]
-    [InlineData("<b>x</b>")]
     public void GIVEN_IsAcceptable_WHEN_NameIsWrittenInAnyLanguage_THEN_ItIsAccepted(string name)
     {
         Assert.True(WorkerNameFormat.IsAcceptable(name));
@@ -35,6 +31,14 @@ public sealed class WorkerNameFormatTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("rig\nINFO forged log line")]
+    [InlineData("rig one")]
+    [InlineData("rig→one")]
+    [InlineData("rig⇒")]
+    [InlineData("garage🔥")]
+    [InlineData("<b>x</b>")]
+    [InlineData("rig!")]
+    [InlineData("rig@home")]
+    [InlineData("rig one")]
     [InlineData("rig\tone")]
     [InlineData("rig\0")]
     [InlineData("rig\u2028one")]
@@ -42,7 +46,7 @@ public sealed class WorkerNameFormatTests
     [InlineData("rig\u200Bone")]
     [InlineData("rig\uFEFF")]
     [InlineData("rig\uE000")]
-    public void GIVEN_IsAcceptable_WHEN_NameHasCharactersThatCannotBeShownOrCouldMislead_THEN_ItIsRefused(string? name)
+    public void GIVEN_IsAcceptable_WHEN_NameHasAnythingOtherThanLettersDigitsAndJoiningPunctuation_THEN_ItIsRefused(string? name)
     {
         Assert.False(WorkerNameFormat.IsAcceptable(name));
     }
@@ -50,18 +54,21 @@ public sealed class WorkerNameFormatTests
     [Fact]
     public void GIVEN_IsAcceptable_WHEN_NameHasHalfOfATwoPartCharacter_THEN_ItIsRefused()
     {
-        var halfAnEmoji = "rig" + "🔥"[0];
+        // An old Chinese character outside the common range is stored as two parts.
+        const string TwoPartLetter = "\uD840\uDC0B";
+        var halfALetter = "rig" + TwoPartLetter[0];
 
-        Assert.False(WorkerNameFormat.IsAcceptable(halfAnEmoji));
+        Assert.True(WorkerNameFormat.IsAcceptable("rig" + TwoPartLetter));
+        Assert.False(WorkerNameFormat.IsAcceptable(halfALetter));
     }
 
     [Fact]
     public void GIVEN_IsAcceptable_WHEN_NameIsAtTheLimit_THEN_EachVisibleCharacterCountsOnce()
     {
-        var thirtyTwoFlags = string.Concat(Enumerable.Repeat("🇳🇴", WorkerNameFormat.MaxLength));
+        var thirtyTwoAccentedLetters = string.Concat(Enumerable.Repeat("a\u030A", WorkerNameFormat.MaxLength));
         var thirtyThreeLetters = new string('å', WorkerNameFormat.MaxLength + 1);
 
-        Assert.True(WorkerNameFormat.IsAcceptable(thirtyTwoFlags));
+        Assert.True(WorkerNameFormat.IsAcceptable(thirtyTwoAccentedLetters));
         Assert.False(WorkerNameFormat.IsAcceptable(thirtyThreeLetters));
     }
 

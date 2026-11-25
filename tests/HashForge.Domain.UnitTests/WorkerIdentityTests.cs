@@ -41,6 +41,9 @@ public sealed class WorkerIdentityTests
     [InlineData("not an address at all.rig1")]
     [InlineData("bc1qaddress0000.rig\nINFO forged log line")]
     [InlineData("bc1qaddress0000.rig\u202Egnp.exe")]
+    [InlineData("bc1qaddress0000.rig one")]
+    [InlineData("bc1qaddress0000.rig→one")]
+    [InlineData("bc1qaddress0000.<b>x</b>")]
     [InlineData("bc1qaddress0000.a-worker-name-that-is-much-longer-than-allowed")]
     public void GIVEN_TryParse_WHEN_AddressOrWorkerNameIsNotAcceptable_THEN_ReturnsFalse(string? username)
     {
@@ -52,9 +55,9 @@ public sealed class WorkerIdentityTests
 
     [Theory]
     [InlineData("bc1qaddress0000.Gårdsrigg", "Gårdsrigg")]
-    [InlineData("bc1qaddress0000.Kjøkken æøå", "Kjøkken æøå")]
+    [InlineData("bc1qaddress0000.Kjøkken-æøå", "Kjøkken-æøå")]
     [InlineData("bc1qaddress0000.矿机一号", "矿机一号")]
-    [InlineData("bc1qaddress0000.garage 🔥", "garage 🔥")]
+    [InlineData("bc1qaddress0000.Ферма-2", "Ферма-2")]
     public void GIVEN_TryParse_WHEN_WorkerNameIsWrittenInAnyLanguage_THEN_ItIsKept(string username, string expectedWorker)
     {
         Assert.True(WorkerIdentity.TryParse(username, out var identity));

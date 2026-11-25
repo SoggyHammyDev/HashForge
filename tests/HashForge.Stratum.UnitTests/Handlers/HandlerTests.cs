@@ -167,9 +167,9 @@ public sealed class HandlerTests
 
     [Theory]
     [InlineData("Gårdsrigg")]
-    [InlineData("Kjøkken æøå")]
+    [InlineData("Kjøkken-æøå")]
     [InlineData("矿机一号")]
-    [InlineData("garage 🔥")]
+    [InlineData("Ферма-2")]
     public async Task GIVEN_Authorize_WHEN_WorkerNameIsNotEnglish_THEN_WorkerIsAuthorisedUnderThatName(string workerName)
     {
         var session = SubscribedSession();
@@ -207,6 +207,9 @@ public sealed class HandlerTests
     [InlineData(".rig1")]
     [InlineData("not an address.rig1")]
     [InlineData("bc1qmineraddress000.rig\nforged line")]
+    [InlineData("bc1qmineraddress000.rig one")]
+    [InlineData("bc1qmineraddress000.rig→one")]
+    [InlineData("bc1qmineraddress000.<script>")]
     [InlineData("bc1qmineraddress000.a-worker-name-that-is-much-longer-than-allowed")]
     public async Task GIVEN_Authorize_WHEN_UsernameHasNoAddress_THEN_ConnectionIsDroppedWithoutAskingNode(string username)
     {

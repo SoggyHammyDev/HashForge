@@ -5,13 +5,14 @@ using System.Text;
 namespace HashForge.Domain;
 
 /// <summary>
-/// Decides what a miner may call one of their machines. A name can be written in any language, with
-/// spaces, symbols and emoji; only characters that could not be shown, or that would let a name pass
-/// itself off as something else, are refused.
+/// Decides what a miner may call one of their machines. A name is made of letters and digits, which may
+/// come from any language, joined by '.', '_' or '-'. Spaces, punctuation, symbols, arrows and emoji are
+/// refused: they are not needed to write a name, and keeping them out leaves nothing that could forge a
+/// log line or carry markup into a page or a message.
 /// </summary>
 public static class WorkerNameFormat
 {
-    /// <summary>The longest name, counted as a reader would count it: "å" or a flag is one.</summary>
+    /// <summary>The longest name, counted as a reader would count it: "å" is one, however it was typed.</summary>
     public const int MaxLength = 32;
 
     /// <summary>
@@ -21,7 +22,7 @@ public static class WorkerNameFormat
     public const int MaxStoredLength = 128;
 
     // These two invisible characters are part of ordinary spelling in Persian and several Indian
-    // scripts, and join the pieces of many emoji, so they are allowed where other invisible ones are not.
+    // scripts, so they are allowed where no other invisible character is.
     private const int ZeroWidthNonJoiner = 0x200C;
     private const int ZeroWidthJoiner = 0x200D;
 
@@ -53,12 +54,12 @@ public static class WorkerNameFormat
 
     private static bool IsAllowed(Rune rune) => Rune.GetUnicodeCategory(rune) switch
     {
-        // Line breaks and other control codes could forge lines in the pool's log.
-        UnicodeCategory.Control or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator => false,
-        // Invisible formatting marks can reverse or hide text, making one name look like another.
-        UnicodeCategory.Format => rune.Value is ZeroWidthNonJoiner or ZeroWidthJoiner,
-        // Not characters at all: nothing can display them.
-        UnicodeCategory.Surrogate or UnicodeCategory.PrivateUse or UnicodeCategory.OtherNotAssigned => false,
-        _ => true,
+        UnicodeCategory.UppercaseLetter or UnicodeCategory.LowercaseLetter or UnicodeCategory.TitlecaseLetter
+            or UnicodeCategory.ModifierLetter or UnicodeCategory.OtherLetter => true,
+        // Accents and vowel signs that attach to the letter before them.
+        UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark => true,
+        // Digits of any script, and numerals that are letters, such as the Chinese zero.
+        UnicodeCategory.DecimalDigitNumber or UnicodeCategory.LetterNumber => true,
+        _ => rune.Value is '.' or '_' or '-' or ZeroWidthNonJoiner or ZeroWidthJoiner,
     };
 }

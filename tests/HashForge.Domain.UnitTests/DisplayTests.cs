@@ -69,10 +69,10 @@ public sealed class DisplayTests
     }
 
     [Fact]
-    public void GIVEN_Shorten_WHEN_ValueEndsInCharactersStoredInSeveralParts_THEN_NoCharacterIsCutInHalf()
+    public void GIVEN_Shorten_WHEN_ValueEndsInLettersWithSeparateAccents_THEN_NoLetterLosesItsAccent()
     {
-        var shortened = Display.Shorten("bc1qabcdefghijklmnop.rig🔥🇸🇪🇳🇴🔥🔥🔥");
+        var shortened = Display.Shorten("bc1qabcdefghijklmnop.riga\u030Aa\u030Aa\u030Aa\u030Aa\u030Aa\u030Aa\u030A");
 
-        Assert.Equal("bc1qabcdef…🔥🇸🇪🇳🇴🔥🔥🔥", shortened);
+        Assert.Equal("bc1qabcdef…a\u030Aa\u030Aa\u030Aa\u030Aa\u030Aa\u030A", shortened);
     }
 }
