@@ -23,6 +23,16 @@ class ImportTests(unittest.TestCase):
         self.assertEqual((self.src / "wallet.dat").read_bytes(), b"private")
         self.assertEqual((self.src / "blocks/blk00000.dat").read_bytes(), b"fixture")
 
+    def test_progress(self):
+        events = []
+        import_snapshot(self.src, self.dest, progress=events.append)
+        self.assertEqual(events[0]["phase"], "copying")
+        self.assertEqual(events[0]["bytes_verified"], 0)
+        self.assertEqual(events[-1]["phase"], "complete")
+        self.assertEqual(events[-1]["percent"], 100)
+        counts = [event["bytes_verified"] for event in events]
+        self.assertEqual(counts, sorted(counts))
+
     def test_existing_destination_rejected(self):
         self.dest.mkdir()
         with self.assertRaises(ValueError):

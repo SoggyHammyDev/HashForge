@@ -42,7 +42,24 @@ public sealed class ComponentTests : WebTestContext
     {
         var links = RenderNav(adminAllowed: false).FindAll("a").Select(a => a.TextContent);
 
-        Assert.Equal(["Pools", "Blocks", "Connect"], links);
+        Assert.Equal(["Pools", "Blocks", "Connect", "Bitcoin Node"], links);
+    }
+
+    [Fact]
+    public void GIVEN_Node_WHEN_StatsUnavailable_THEN_ShowsWaiting()
+    {
+        NetworkStats.Current.Returns((HashForge.Mining.Network.NetworkStats?)null);
+        Assert.Contains("Waiting for Bitcoin Core", Render<Node>().Markup);
+    }
+
+    [Fact]
+    public void GIVEN_Node_WHEN_Synchronising_THEN_ShowsProgress()
+    {
+        NetworkStats.Current.Returns(Network(synced: false));
+        var page = Render<Node>();
+        Assert.Contains("50%", page.Markup);
+        Assert.Contains("Pruned", page.Markup);
+        Assert.Contains("Waiting for synchronization", page.Markup);
     }
 
     [Fact]

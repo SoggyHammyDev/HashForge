@@ -19,3 +19,7 @@ Run `bash tools/node/test_regtest_import.sh hashforge-bitcoind:ci` from the repo
 ## Read-only discovery
 
 Run `python3 tools/node/preflight.py /path/to/umbrel/app-data /path/to/snapshots --destination-parent /path/to/hashforge/data` on the host. Only explicitly supplied roots are scanned, to a bounded depth. Results are candidates, not proof of version, pruning or network compatibility. Do not expose host directories to the web container. Source-specific Soggy Pools layouts still require verification on a real installation.
+
+The import CLI emits JSON progress events after each fully copied and verified file. Rates and ETA are approximate and include verification time. No web-controlled import is enabled yet.
+
+Development image publishing is manual, restricted to the standalone branch of the fork, and uses immutable commit tags rather than latest. After green CI, run Publish standalone development images and verify both package visibility and digests before updating the Umbrel package.
