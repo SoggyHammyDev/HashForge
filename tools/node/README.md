@@ -11,3 +11,7 @@ Destination must not exist. The utility copies blocks and chainstate only, check
 Run fixture tests: python3 -m unittest discover -s tools/node -p 'test_*.py'
 
 Before production: validate with real regtest databases, detect version/network/pruning, enforce read-only mounts, implement power-loss durability, integrate with node lifecycle, and test Soggy Pools paths. Do not use production funds or mining until validation is complete.
+
+## Real database test
+
+Run `bash tools/node/test_regtest_import.sh hashforge-bitcoind:ci` from the repository root after building the node image. The test creates an isolated regtest chain, stops the source cleanly, copies the database, verifies the destination tip and chain, generates an additional block, and compares source file checksums. This does not yet prove mainnet compatibility or pool Stratum block submission.
