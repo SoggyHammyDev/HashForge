@@ -15,6 +15,11 @@ else if (Configuration["NodeSetup:Enabled"] != "true")
 {
     <p class="notice">Managed setup is not enabled for this installation.</p>
 }
+else if (WorkerEnabled && System.IO.File.Exists("/requests/request"))
+{
+    <p class="notice">Setup request submitted. Refresh this page for the latest worker status.</p>
+    <p>@WorkerStatus()</p>
+}
 else if (System.IO.File.Exists("/setup/decision"))
 {
     <p class="notice">A setup decision already exists. Open the Bitcoin Node page to monitor synchronization.</p>
@@ -25,8 +30,18 @@ else
         <p>This starts downloading and validating Bitcoin into HashForge's independent storage. It does not access another application's blockchain.</p>
         <EditForm Model="Form!" FormName="node-setup" OnValidSubmit="ApproveFresh" class="stack-form">
             <label>Setup authorization code <InputText type="password" @bind-Value="Form!.Token" autocomplete="off" /></label>
-            <label><InputCheckbox @bind-Value="Form!.Confirmed" /> I have checked available storage and want to start a fresh sync.</label>
-            <button type="submit">Start synchronization</button>
+            <label><InputCheckbox @bind-Value="Form!.Confirmed" /> I have checked available storage and confirmed my setup choice.</label>
+            @if (WorkerEnabled)
+            {
+                <label>Setup method
+                    <InputSelect @bind-Value="Form!.Mode">
+                        <option value="fresh">Fresh synchronization</option>
+                        <option value="imported">Import the host-prepared snapshot</option>
+                    </InputSelect>
+                </label>
+                <p>For imports, confirm the host administrator prepared a clean, compatible archival snapshot and sufficient space.</p>
+            }
+            <button type="submit">Submit setup choice</button>
         </EditForm>
         @if (_message is not null)
         {
@@ -35,7 +50,7 @@ else
     </SectionCard>
     <SectionCard Icon="IconKind.Storage" Title="Import an existing blockchain">
         <p>Do not start a fresh sync if you intend to import. Ask the host administrator to prepare a compatible, clean, read-only snapshot and run the offline importer. The original node's data remains independent.</p>
-        <p>After verification the administrator publishes the imported setup decision. Browser-controlled copying is not enabled yet.</p>
+        <p>After verification the administrator publishes the imported setup decision. When the restricted worker is enabled, select import above to request copying the single host-prepared snapshot.</p>
     </SectionCard>
 }
 <p><a href="node">View Bitcoin node status</a></p>
@@ -50,6 +65,21 @@ else
     protected override void OnInitialized() => Form ??= new();
 
     private string? _message;
+    private bool WorkerEnabled => Configuration["NodeSetup:WorkerEnabled"] == "true";
+
+    private static string WorkerStatus()
+    {
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText("/status/state.json"));
+            var root = document.RootElement;
+            var phase = root.GetProperty("phase").GetString();
+            return root.TryGetProperty("percent", out var percent) ? $"{phase}: {percent.GetDouble():F2}% verified" : phase ?? "Waiting for worker";
+        }
+        catch (IOException) { return "Waiting for worker"; }
+        catch (UnauthorizedAccessException) { return "Worker status unavailable"; }
+        catch (System.Text.Json.JsonException) { return "Worker status unavailable"; }
+    }
 
     private void ApproveFresh()
     {
@@ -66,12 +96,20 @@ else
         }
 
         // Fixed directory and fixed decision only. Never accept a path or shell command from the browser.
-        var temp = System.IO.Path.Combine("/setup", ".decision-" + Guid.NewGuid().ToString("N"));
+        var mode = WorkerEnabled ? Form.Mode : "fresh";
+        if (mode is not ("fresh" or "imported"))
+        {
+            _message = "Invalid setup choice.";
+            return;
+        }
+        var directory = WorkerEnabled ? "/requests" : "/setup";
+        var target = System.IO.Path.Combine(directory, WorkerEnabled ? "request" : "decision");
+        var temp = System.IO.Path.Combine(directory, ".decision-" + Guid.NewGuid().ToString("N"));
         try
         {
-            System.IO.File.WriteAllText(temp, "fresh\n");
-            System.IO.File.Move(temp, "/setup/decision", overwrite: false);
-            _message = "Fresh synchronization approved.";
+            System.IO.File.WriteAllText(temp, mode + "\n");
+            System.IO.File.Move(temp, target, overwrite: false);
+            _message = WorkerEnabled ? "Setup request submitted." : "Fresh synchronization approved.";
         }
         catch (IOException)
         {
@@ -94,5 +132,6 @@ else
     {
         public string? Token { get; set; }
         public bool Confirmed { get; set; }
+        public string Mode { get; set; } = "fresh";
     }
 }
