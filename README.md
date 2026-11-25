@@ -159,6 +159,7 @@ manage their own apps, each in its own repository:
 | Platform | Repository | What you get |
 |---|---|---|
 | Home Assistant | [HashForge-HA](https://github.com/owenashurst/HashForge-HA) | An app (add-on) with the pool, a Bitcoin node and both databases in one install, opened from the Home Assistant sidebar. Runs on Intel/AMD and ARM. |
+| Umbrel | [HashForge-Umbrel](https://github.com/owenashurst/HashForge-Umbrel) | A community app store with the pool and both databases, using the Bitcoin node your Umbrel already runs. Not yet tested on a real Umbrel. |
 
 These packages are built from this repository, so they run the same pool; report problems with a
 package in its own repository and problems with the pool here.
