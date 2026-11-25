@@ -209,6 +209,10 @@ to the proxy's IP. The pool then reads the visitor's real address from the proxy
 and the allow-list works as intended. Without it, do not add the proxy's address to the allowed networks:
 that would open the admin page to everyone.
 
+**Under a sub-path.** To serve the pool at an address such as `https://example.com/pool/`, have the proxy
+strip `/pool` before forwarding and send it in a request header, then name that header in
+`PATH_BASE_HEADER` (for example `X-Forwarded-Prefix`). The pool then writes every link with the prefix.
+
 Pools started from the admin page need a port that Docker publishes; `ADMIN_POOL_PORT_RANGE` (default
 `3337-3341`) reserves a few for this.
 
@@ -312,7 +316,7 @@ Environment variables use `__` between levels, for example `Stratum__InitialDiff
 | `Mining` | `Pools` (name, scheme `Solo`/`Prop`/`Pplns`/`FinderBonus`, port, fee, fee address, finder bonus, limits), `CoinbaseTag`, `TemplateRefreshSeconds`, `NetworkStatsRefreshSeconds`, `StateSnapshotSeconds`, `HistorySampleMinutes`, `MinerHistoryHours` |
 | `Stratum` | `InitialDifficulty`, `MinDifficulty`, `MaxDifficulty`, `TargetSharesPerMinute`, `RetargetSeconds`, `IdleTimeoutSeconds`, `SendTimeoutSeconds`, `MaxConnections`, `MaxConnectionsPerAddress`, `VersionRollingMask` |
 | `Notifications` | `DiscordWebhookUrl`, `NotifyBlockFound`, `NotifyBestShare`, `BestShareCooldownSeconds` |
-| `Web` | `RefreshSeconds`, `StratumHost`, `RecentBlockCount`, `ChartHours`, `TrustedProxies` |
+| `Web` | `RefreshSeconds`, `StratumHost`, `RecentBlockCount`, `ChartHours`, `TrustedProxies`, `PathBaseHeader` |
 | `Branding` | `Name`, `Tagline`, `AccentColor`, `LogoUrl` |
 | `Admin` | `AllowedNetworks` (CIDR ranges) |
 

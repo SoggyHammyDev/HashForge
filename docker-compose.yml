@@ -135,6 +135,8 @@ services:
       Branding__LogoUrl: ${BRAND_LOGO_URL:-}
       # Set to your reverse proxy's IP when the web UI sits behind one, so the admin allow-list sees real visitors.
       Web__TrustedProxies__0: ${TRUSTED_PROXY:-}
+      # Set when a reverse proxy serves the web UI under a sub-path and names that path in a request header.
+      Web__PathBaseHeader: ${PATH_BASE_HEADER:-}
       Web__StratumHost: ${STRATUM_HOST:-your-pool-host}
       Admin__AllowedNetworks__0: ${ADMIN_NETWORK_1:-192.168.0.0/24}
       Admin__AllowedNetworks__1: ${ADMIN_NETWORK_2:-192.168.1.0/24}

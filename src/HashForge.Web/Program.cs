@@ -22,6 +22,7 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
 var app = builder.Build();
 
+app.UseMiddleware<PathBaseHeaderMiddleware>();
 app.UseForwardedHeaders();
 app.UseExceptionHandler("/Error", createScopeForErrors: true);
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);

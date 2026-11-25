@@ -28,6 +28,13 @@ public sealed class WebOptions
     /// </summary>
     public IList<string> TrustedProxies { get; init; } = [];
 
+    /// <summary>
+    /// The request header in which a reverse proxy names the sub-path it serves the pool under, for example
+    /// <c>X-Ingress-Path</c> for Home Assistant or <c>X-Forwarded-Prefix</c>. Leave empty when the pool is
+    /// served from the root of its address.
+    /// </summary>
+    public string PathBaseHeader { get; set; } = string.Empty;
+
     /// <summary>The proxies actually configured; blank entries (an unset environment variable) are ignored.</summary>
     public IEnumerable<string> ConfiguredProxies => TrustedProxies.Where(proxy => !string.IsNullOrWhiteSpace(proxy));
 }

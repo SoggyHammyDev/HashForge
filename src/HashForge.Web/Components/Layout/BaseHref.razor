@@ -1,0 +1,10 @@
+@* Every link, stylesheet and script on the site is relative to this address, so it has to carry the
+   sub-path the pool is served under, if a reverse proxy has given it one. *@
+<base href="@Href" />
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string Href => $"{HttpContext?.Request.PathBase}/";
+}
