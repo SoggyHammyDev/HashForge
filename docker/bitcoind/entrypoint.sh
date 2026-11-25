@@ -5,6 +5,25 @@ set -eu
 : "${RPC_USER:?RPC_USER must be set}"
 : "${RPC_PASSWORD:?RPC_PASSWORD must be set}"
 
+# Optional gate is deliberately read-only to the node. Only a trusted host operator
+# may publish a decision after preparing the independent destination data directory.
+if [ "${HASHFORGE_SETUP_GATE:-0}" = "1" ]; then
+    echo "Waiting for explicit Bitcoin node setup approval"
+    trap 'exit 0' TERM INT
+    while :; do
+        decision=""
+        if [ -f /setup/decision ]; then
+            decision="$(cat /setup/decision)"
+        fi
+        case "$decision" in
+            fresh|imported) break ;;
+        esac
+        sleep 2 & wait $!
+    done
+    trap - TERM INT
+    echo "Bitcoin node setup approved: $decision"
+fi
+
 NETWORK="${NETWORK:-mainnet}"
 PRUNE_MB="${PRUNE_MB:-550}"
 BLOCK_RESERVED_WEIGHT="${BLOCK_RESERVED_WEIGHT:-100000}"
@@ -44,6 +63,7 @@ exec $RUN_AS bitcoind \
     -datadir=/data \
     -printtoconsole \
     -server=1 \
+    -disablewallet=1 \
     -rpcauth="${RPC_USER}:${SALT}\$${HASH}" \
     -rpcbind=0.0.0.0 \
     -rpcallowip=10.0.0.0/8 \

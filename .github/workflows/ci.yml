@@ -75,3 +75,4 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build --tag hashforge-bitcoind:ci docker/bitcoind
       - run: bash tools/node/test_regtest_import.sh hashforge-bitcoind:ci
+      - run: bash tools/node/test_setup_gate.sh hashforge-bitcoind:ci

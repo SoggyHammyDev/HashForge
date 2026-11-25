@@ -23,3 +23,7 @@ Run `python3 tools/node/preflight.py /path/to/umbrel/app-data /path/to/snapshots
 The import CLI emits JSON progress events after each fully copied and verified file. Rates and ETA are approximate and include verification time. No web-controlled import is enabled yet.
 
 Development image publishing is manual, restricted to the standalone branch of the fork, and uses immutable commit tags rather than latest. After green CI, run Publish standalone development images and verify both package visibility and digests before updating the Umbrel package.
+
+## Optional startup gate
+
+Set HASHFORGE_SETUP_GATE=1 on the node container and mount a dedicated host-owned setup directory at /setup:ro. The node waits for a decision file containing fresh or imported. The host administrator must prepare the destination, ensure no import is running, then use `python3 tools/node/approve_setup.py /path/to/setup fresh --confirm-destination-prepared` (or imported). Decisions are one-time and persist over restart. The approval utility does not validate the destination; never approve an unverified import. The web application does not have write access to this directory. This opt-in gate is not yet enabled in the default Compose stacks, and no GUI start action exists yet.
