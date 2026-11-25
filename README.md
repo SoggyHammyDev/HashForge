@@ -151,6 +151,18 @@ The node image downloads the official Bitcoin Core release from bitcoincore.org,
 the published checksums and requires at least three valid release-signer signatures. The version is pinned by
 `BITCOIN_VERSION`; change it deliberately when you want to upgrade.
 
+## Other ways to run it
+
+The Docker stack above is the reference way to run HashForge. It is also packaged for platforms that
+manage their own apps, each in its own repository:
+
+| Platform | Repository | What you get |
+|---|---|---|
+| Home Assistant | [HashForge-HA](https://github.com/owenashurst/HashForge-HA) | An app (add-on) with the pool, a Bitcoin node and both databases in one install, opened from the Home Assistant sidebar. Runs on Intel/AMD and ARM. |
+
+These packages are built from this repository, so they run the same pool; report problems with a
+package in its own repository and problems with the pool here.
+
 ## How payouts work
 
 | Scheme | Who is paid when a block is found |
