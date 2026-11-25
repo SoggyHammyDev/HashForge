@@ -1,6 +1,8 @@
 # HashForge pool: Stratum server, background jobs and web UI in one process.
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Compiled on the build machine's own architecture: the output is the same for every processor, and it
+# avoids running the .NET compiler under emulation when the image is built for ARM on an Intel machine.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
 
 # Restore and publish in one step, with all sources present. Restoring from project files alone
