@@ -23,9 +23,9 @@ else
 {
     <SectionCard Icon="IconKind.Sync" Title="Start a fresh archival sync">
         <p>This starts downloading and validating Bitcoin into HashForge's independent storage. It does not access another application's blockchain.</p>
-        <EditForm Model="Form" FormName="node-setup" OnValidSubmit="ApproveFresh" class="stack-form">
-            <label>Setup authorization code <InputText type="password" @bind-Value="Form.Token" autocomplete="off" /></label>
-            <label><InputCheckbox @bind-Value="Form.Confirmed" /> I have checked available storage and want to start a fresh sync.</label>
+        <EditForm Model="Form!" FormName="node-setup" OnValidSubmit="ApproveFresh" class="stack-form">
+            <label>Setup authorization code <InputText type="password" @bind-Value="Form!.Token" autocomplete="off" /></label>
+            <label><InputCheckbox @bind-Value="Form!.Confirmed" /> I have checked available storage and want to start a fresh sync.</label>
             <button type="submit">Start synchronization</button>
         </EditForm>
         @if (_message is not null)
@@ -45,7 +45,9 @@ else
     private HttpContext? HttpContext { get; set; }
 
     [SupplyParameterFromForm]
-    private SetupForm Form { get; set; } = new();
+    private SetupForm? Form { get; set; }
+
+    protected override void OnInitialized() => Form ??= new();
 
     private string? _message;
 
@@ -54,7 +56,7 @@ else
         var expected = Configuration["NodeSetup:Token"];
         if (!AdminAccess.IsAllowed(HttpContext?.Connection.RemoteIpAddress) ||
             Configuration["NodeSetup:Enabled"] != "true" ||
-            !Form.Confirmed || string.IsNullOrWhiteSpace(expected) || expected.Length < 32 ||
+            Form is null || !Form.Confirmed || string.IsNullOrWhiteSpace(expected) || expected.Length < 32 ||
             !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(expected)),
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Form.Token ?? ""))))
