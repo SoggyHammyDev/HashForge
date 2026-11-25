@@ -15,3 +15,7 @@ Before production: validate with real regtest databases, detect version/network/
 ## Real database test
 
 Run `bash tools/node/test_regtest_import.sh hashforge-bitcoind:ci` from the repository root after building the node image. The test creates an isolated regtest chain, stops the source cleanly, copies the database, verifies the destination tip and chain, generates an additional block, and compares source file checksums. This does not yet prove mainnet compatibility or pool Stratum block submission.
+
+## Read-only discovery
+
+Run `python3 tools/node/preflight.py /path/to/umbrel/app-data /path/to/snapshots --destination-parent /path/to/hashforge/data` on the host. Only explicitly supplied roots are scanned, to a bounded depth. Results are candidates, not proof of version, pruning or network compatibility. Do not expose host directories to the web container. Source-specific Soggy Pools layouts still require verification on a real installation.

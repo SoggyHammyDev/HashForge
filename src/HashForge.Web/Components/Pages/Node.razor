@@ -1,0 +1,50 @@
+@page "/node"
+@rendermode InteractiveServer
+@inherits RefreshingComponent
+@inject INetworkStatsStore NetworkStats
+
+<BrandTitle />
+<div class="page-head">
+    <h1>Bitcoin Node</h1>
+    <p>Live synchronization and storage information for the Bitcoin node connected to this pool.</p>
+</div>
+
+<SectionCard Icon="IconKind.Network" Title="Node status">
+    @if (_network is null)
+    {
+        <p class="notice">Waiting for Bitcoin Core to report its state.</p>
+    }
+    else
+    {
+        @if (Now - _network.UpdatedAt > TimeSpan.FromMinutes(2))
+        {
+            <p class="notice">Node statistics are stale. Check the connection before relying on this status.</p>
+        }
+        <section class="tiles">
+            <StatTile Icon="IconKind.Block" Label="Validated block height" Value="@Display.Count(_network.Height)" Hint="@_network.Chain" />
+            <StatTile Icon="IconKind.Block" Label="Header height" Value="@Display.Count(_network.Headers)" />
+            <StatTile Icon="IconKind.Network" Label="Verification progress" Value="@Display.Percent(_network.SyncPercent)" />
+            <StatTile Icon="IconKind.Clock" Label="Last updated" Value="@Display.Age(_network.UpdatedAt, Now)" />
+        </section>
+        <p>Storage mode: @(_network.Pruned ? "Pruned" : "Archival")</p>
+        <p>Blockchain storage reported by Core: @(_network.SizeOnDisk / 1073741824.0) GiB</p>
+        <p>Synchronization: @(_network.IsSynced ? "Complete" : "In progress")</p>
+        <p>Mining readiness reported by node: @(_network.IsReadyForMining ? "Ready" : "Waiting for synchronization")</p>
+        <progress max="100" value="@Math.Clamp(_network.SyncPercent, 0, 100)" aria-label="Blockchain verification progress"></progress>
+    }
+</SectionCard>
+
+<SectionCard Icon="IconKind.Network" Title="Node setup">
+    <p>HashForge can run with a dedicated Bitcoin Core node or connect to a separately configured node.</p>
+    <p>Existing archival blockchain data can be imported using the experimental offline importer before starting the destination node. The original snapshot is preserved.</p>
+    <p>Setup and import commands are currently administrator-operated. This page is read-only and cannot access or change other applications' data.</p>
+</SectionCard>
+
+@code {
+    private NetworkStats? _network;
+    protected override Task LoadAsync()
+    {
+        _network = NetworkStats.Current;
+        return Task.CompletedTask;
+    }
+}
