@@ -19,6 +19,20 @@ public sealed class PoolDefinitionTests
         Assert.Equal(new PayoutRules(1.5m, "pool", 100, 2_000), pool.ToPayoutRules());
     }
 
+    [Theory]
+    [InlineData(10, 10)]
+    [InlineData(99, 99)]
+    [InlineData(100, 100)]
+    [InlineData(101, 100)]
+    [InlineData(0, 100)]
+    [InlineData(-1, 100)]
+    public void GIVEN_CappedAt_WHEN_CeilingGiven_THEN_LimitIsLoweredButNeverRaised(int ceiling, int expected)
+    {
+        var rules = new PayoutRules(1.5m, "pool", 100, 2_000);
+
+        Assert.Equal(rules with { MaxOutputs = expected }, rules.CappedAt(ceiling));
+    }
+
     [Fact]
     public void GIVEN_PoolDefinition_WHEN_OnlyRequiredValuesSet_THEN_DefaultsApply()
     {

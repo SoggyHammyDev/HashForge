@@ -74,6 +74,14 @@ public sealed class PoolValidationTests
         Assert.Contains(_optionsValidator.Validate(null, options).Failures!, f => f.Contains("CoinbaseTag"));
     }
 
+    [Fact]
+    public void GIVEN_OptionsValidate_WHEN_OutputCeilingIsNegative_THEN_Fails()
+    {
+        var options = new MiningOptions { MaxCoinbaseOutputsCeiling = -1 };
+
+        Assert.Contains(_optionsValidator.Validate(null, options).Failures!, f => f.Contains("MaxCoinbaseOutputsCeiling"));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(17)]

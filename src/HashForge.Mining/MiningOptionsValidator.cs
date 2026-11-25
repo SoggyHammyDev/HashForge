@@ -26,6 +26,11 @@ public sealed class MiningOptionsValidator : IValidateOptions<MiningOptions>
             errors.Add($"Extranonce2Size must be between {MinExtranonce2Size} and {MaxExtranonce2Size}.");
         }
 
+        if (options.MaxCoinbaseOutputsCeiling < 0)
+        {
+            errors.Add("MaxCoinbaseOutputsCeiling must be zero (no ceiling) or more.");
+        }
+
         errors.AddRange(RequirePositive(
             (nameof(options.ChainTipPollSeconds), options.ChainTipPollSeconds),
             (nameof(options.TemplateRefreshSeconds), options.TemplateRefreshSeconds),

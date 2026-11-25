@@ -325,7 +325,7 @@ Environment variables use `__` between levels, for example `Stratum__InitialDiff
 |---|---|
 | `BitcoinNode` | `RpcUrl`, `RpcUser`, `RpcPassword`, `RpcTimeoutSeconds`, `ZmqBlockUrl` |
 | `Persistence` | `RedisConnectionString`, `RedisKeyPrefix`, `PostgresConnectionString` |
-| `Mining` | `Pools` (name, scheme `Solo`/`Prop`/`Pplns`/`FinderBonus`, port, fee, fee address, finder bonus, limits), `CoinbaseTag`, `TemplateRefreshSeconds`, `NetworkStatsRefreshSeconds`, `StateSnapshotSeconds`, `HistorySampleMinutes`, `MinerHistoryHours` |
+| `Mining` | `Pools` (name, scheme `Solo`/`Prop`/`Pplns`/`FinderBonus`, port, fee, fee address, finder bonus, limits), `CoinbaseTag`, `MaxCoinbaseOutputsCeiling`, `TemplateRefreshSeconds`, `NetworkStatsRefreshSeconds`, `StateSnapshotSeconds`, `HistorySampleMinutes`, `MinerHistoryHours` |
 | `Stratum` | `InitialDifficulty`, `MinDifficulty`, `MaxDifficulty`, `TargetSharesPerMinute`, `RetargetSeconds`, `IdleTimeoutSeconds`, `SendTimeoutSeconds`, `MaxConnections`, `MaxConnectionsPerAddress`, `VersionRollingMask` |
 | `Notifications` | `DiscordWebhookUrl`, `NotifyBlockFound`, `NotifyBestShare`, `BestShareCooldownSeconds` |
 | `Web` | `RefreshSeconds`, `StratumHost`, `RecentBlockCount`, `ChartHours`, `TrustedProxies`, `PathBaseHeader` |

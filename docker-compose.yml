@@ -84,6 +84,8 @@ services:
       Persistence__RedisConnectionString: redis:6379
       Persistence__PostgresConnectionString: Host=postgres;Database=hashforge;Username=${POSTGRES_USER:-hashforge};Password=${POSTGRES_PASSWORD}
       Mining__CoinbaseTag: ${COINBASE_TAG:-/HashForge/}
+      # Caps payout outputs for every pool, including ones added from the admin page; 0 means no cap.
+      Mining__MaxCoinbaseOutputsCeiling: ${MAX_COINBASE_OUTPUTS_CEILING:-0}
       # Between blocks, how often miners get a new job that includes the latest transactions.
       Mining__TemplateRefreshSeconds: ${TEMPLATE_REFRESH_SECONDS:-30}
       # How often difficulty, network hashrate, height and sync progress are re-read from the node.

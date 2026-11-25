@@ -27,6 +27,22 @@ public sealed class JobTests
 
     private JobFactory Factory() => new(_weights, _resolver, TestData.Options());
 
+    [Theory]
+    [InlineData(0, 5)]
+    [InlineData(2, 2)]
+    [InlineData(9, 5)]
+    public async Task GIVEN_CreateAsync_WHEN_PoolWideOutputCeilingSet_THEN_NoMoreMinersArePaidThanItAllows(int ceiling, int expectedPaid)
+    {
+        var miners = Enumerable.Range(1, 5).ToDictionary(i => $"miner{i}", i => (double)i);
+        _weights.GetPlan(Arg.Any<PoolDefinition>(), Arg.Any<string>()).Returns(new PayoutPlan(miners));
+        _resolver.ResolveAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new AddressResolution(true, [0x51], null));
+        var factory = new JobFactory(_weights, _resolver, TestData.Options(o => o.MaxCoinbaseOutputsCeiling = ceiling));
+
+        var job = await factory.CreateAsync(new JobIdentity("1", 0), _shared with { FeePercent = 0 }, TestData.Template(), TestData.MinerAddress, CancellationToken.None);
+
+        Assert.Equal(expectedPaid, job.Payouts.Count);
+    }
+
     [Fact]
     public void GIVEN_MiningJob_WHEN_Constructed_THEN_DerivesHeaderFieldsFromTemplate()
     {

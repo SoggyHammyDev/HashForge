@@ -26,15 +26,16 @@ public sealed class JobFactory(
         ArgumentNullException.ThrowIfNull(pool);
         ArgumentNullException.ThrowIfNull(template);
 
+        var settings = options.Value;
         var plan = planSource.GetPlan(pool, minerAddress);
-        var payouts = PayoutDistributor.Distribute(plan.Weights, template.CoinbaseValue, pool.ToPayoutRules(), plan.FinderBonus);
+        var rules = pool.ToPayoutRules().CappedAt(settings.MaxCoinbaseOutputsCeiling);
+        var payouts = PayoutDistributor.Distribute(plan.Weights, template.CoinbaseValue, rules, plan.FinderBonus);
         var outputs = new List<TransactionOutput>(payouts.Count);
         foreach (var payout in payouts)
         {
             outputs.Add(new TransactionOutput(payout.Satoshis, await ResolveScriptAsync(payout.Address, cancellationToken).ConfigureAwait(false)));
         }
 
-        var settings = options.Value;
         var coinbase = CoinbaseBuilder.Build(new CoinbaseSpec(
             template.Height,
             Encoding.UTF8.GetBytes(settings.CoinbaseTag),
