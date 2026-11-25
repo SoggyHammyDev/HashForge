@@ -11,6 +11,10 @@ Core node, Redis, PostgreSQL and the pool itself.
 
 *The home page, shown with sample data.*
 
+**Proven on a public network:** a HashForge pool mined
+[testnet4 block 163,288](https://mempool.space/testnet4/block/00000000000000010560378a7aa2148e0d95599f93b587a752c9ada82627b2c8) at the network's full difficulty. The block is on the main chain and its
+coinbase pays the miner and the pool fee directly, exactly as the pool calculated.
+
 ## Features
 
 **Payouts**
@@ -380,7 +384,8 @@ By contributing you agree that your work is released under the project's [MIT li
 ## Before mining on mainnet
 
 Unit tests cannot prove that the Bitcoin network will accept a block. The project has been checked end to end
-on `regtest`, where Bitcoin Core accepted blocks from every payout scheme and paid the expected addresses, but
+on `regtest`, where Bitcoin Core accepted blocks from every payout scheme and paid the expected addresses, and
+on `testnet4`, where the solo pool mined [block 163,288](https://mempool.space/testnet4/block/00000000000000010560378a7aa2148e0d95599f93b587a752c9ada82627b2c8) on the public chain, but
 your deployment is yours to verify. Before pointing real hashrate at mainnet, run the stack on `testnet4` or
 `regtest`, connect a miner, and confirm that a block found by the pool is accepted by the node and pays the
 addresses you expect.
