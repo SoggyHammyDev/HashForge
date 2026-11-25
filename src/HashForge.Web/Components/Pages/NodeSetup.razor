@@ -1,0 +1,96 @@
+@page "/admin/node-setup"
+@inject IConfiguration Configuration
+@inject IAdminAccessPolicy AdminAccess
+
+<BrandTitle Page="Node setup" />
+<div class="page-head">
+    <h1>Bitcoin node setup</h1>
+    <p>Choose how to initialize the dedicated Bitcoin node before it starts.</p>
+</div>
+@if (!AdminAccess.IsAllowed(HttpContext?.Connection.RemoteIpAddress))
+{
+    <p class="notice">Setup is unavailable from this network.</p>
+}
+else if (Configuration["NodeSetup:Enabled"] != "true")
+{
+    <p class="notice">Managed setup is not enabled for this installation.</p>
+}
+else if (System.IO.File.Exists("/setup/decision"))
+{
+    <p class="notice">A setup decision already exists. Open the Bitcoin Node page to monitor synchronization.</p>
+}
+else
+{
+    <SectionCard Icon="IconKind.Sync" Title="Start a fresh archival sync">
+        <p>This starts downloading and validating Bitcoin into HashForge's independent storage. It does not access another application's blockchain.</p>
+        <EditForm Model="Form" FormName="node-setup" OnValidSubmit="ApproveFresh" class="stack-form">
+            <label>Setup authorization code <InputText type="password" @bind-Value="Form.Token" autocomplete="off" /></label>
+            <label><InputCheckbox @bind-Value="Form.Confirmed" /> I have checked available storage and want to start a fresh sync.</label>
+            <button type="submit">Start synchronization</button>
+        </EditForm>
+        @if (_message is not null)
+        {
+            <p role="status">@_message</p>
+        }
+    </SectionCard>
+    <SectionCard Icon="IconKind.Storage" Title="Import an existing blockchain">
+        <p>Do not start a fresh sync if you intend to import. Ask the host administrator to prepare a compatible, clean, read-only snapshot and run the offline importer. The original node's data remains independent.</p>
+        <p>After verification the administrator publishes the imported setup decision. Browser-controlled copying is not enabled yet.</p>
+    </SectionCard>
+}
+<p><a href="node">View Bitcoin node status</a></p>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [SupplyParameterFromForm]
+    private SetupForm Form { get; set; } = new();
+
+    private string? _message;
+
+    private void ApproveFresh()
+    {
+        var expected = Configuration["NodeSetup:Token"];
+        if (!AdminAccess.IsAllowed(HttpContext?.Connection.RemoteIpAddress) ||
+            Configuration["NodeSetup:Enabled"] != "true" ||
+            !Form.Confirmed || string.IsNullOrWhiteSpace(expected) || expected.Length < 32 ||
+            !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(expected)),
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Form.Token ?? ""))))
+        {
+            _message = "Setup authorization or confirmation failed.";
+            return;
+        }
+
+        // Fixed directory and fixed decision only. Never accept a path or shell command from the browser.
+        var temp = System.IO.Path.Combine("/setup", ".decision-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            System.IO.File.WriteAllText(temp, "fresh\n");
+            System.IO.File.Move(temp, "/setup/decision", overwrite: false);
+            _message = "Fresh synchronization approved.";
+        }
+        catch (IOException)
+        {
+            _message = "Setup could not be saved or has already been approved.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _message = "Setup storage is not writable.";
+        }
+        finally
+        {
+            if (System.IO.File.Exists(temp))
+            {
+                System.IO.File.Delete(temp);
+            }
+        }
+    }
+
+    private sealed class SetupForm
+    {
+        public string? Token { get; set; }
+        public bool Confirmed { get; set; }
+    }
+}
